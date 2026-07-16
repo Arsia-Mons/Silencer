@@ -89,11 +89,18 @@ void FeedTuiUiScancodeDown(Game & game, SDL_Scancode sc, const Uint8 * newkeysta
 		::ui::ui_input_push_key(ui, key, mods, false);
 		fedUi = true;
 	}
+	// Directional UI nav follows the keymap; printable keys are exempt while a
+	// text field is focused so they type instead of navigating (#315). Mirrors
+	// the windowed path in session/events.cpp.
+	const bool printable = TuiPrintableFromScancode(sc, mods) != '\0';
+	if(!(printable && routeTextInput)){
+		const KeyMap & km = game.GetKeyMap();
+		if(km.IsPressedByScancode(Action::UiUp, (int)sc, newkeystate)) { ui.nav_up = true; fedUi = true; }
+		if(km.IsPressedByScancode(Action::UiDown, (int)sc, newkeystate)) { ui.nav_down = true; fedUi = true; }
+		if(km.IsPressedByScancode(Action::UiLeft, (int)sc, newkeystate)) { ui.nav_left = true; fedUi = true; }
+		if(km.IsPressedByScancode(Action::UiRight, (int)sc, newkeystate)) { ui.nav_right = true; fedUi = true; }
+	}
 	switch(sc){
-	case SDL_SCANCODE_UP: ui.nav_up = true; fedUi = true; break;
-	case SDL_SCANCODE_DOWN: ui.nav_down = true; fedUi = true; break;
-	case SDL_SCANCODE_LEFT: ui.nav_left = true; fedUi = true; break;
-	case SDL_SCANCODE_RIGHT: ui.nav_right = true; fedUi = true; break;
 	case SDL_SCANCODE_TAB:
 		if(mods & ::ui::UI_KEY_MOD_SHIFT)
 			ui.nav_previous = true;

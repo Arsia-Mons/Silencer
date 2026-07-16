@@ -115,19 +115,29 @@ bool Game::HandleSDLEvents() {
             if (k != ::ui::UiKey::Unknown) {
                 ::ui::ui_input_push_key(ui, k, mods, event.key.repeat);
             }
+            // Directional UI nav follows the keymap (ui_up/ui_down/ui_left/
+            // ui_right), so arrows navigate only while bound and W/S-style
+            // bindings work. Printable keys are exempt while a text field is
+            // focused: they arrive as TEXT_INPUT and must type, not navigate
+            // (#315 — wasd profile binds letters to nav).
+            {
+                const bool printable = event.key.key >= SDLK_SPACE &&
+                                       !(event.key.key & SDLK_SCANCODE_MASK);
+                if (!(printable && gameUiPipeline.WantsTextInput())) {
+                    const KeyMap &km = gameInput.GetKeyMap();
+                    const Uint8 *ks = gameInput.GetKeystate();
+                    const int sc = (int)event.key.scancode;
+                    if (km.IsPressedByScancode(Action::UiUp, sc, ks))
+                        ui.nav_up = true;
+                    if (km.IsPressedByScancode(Action::UiDown, sc, ks))
+                        ui.nav_down = true;
+                    if (km.IsPressedByScancode(Action::UiLeft, sc, ks))
+                        ui.nav_left = true;
+                    if (km.IsPressedByScancode(Action::UiRight, sc, ks))
+                        ui.nav_right = true;
+                }
+            }
             switch (event.key.key) {
-            case SDLK_UP:
-                ui.nav_up = true;
-                break;
-            case SDLK_DOWN:
-                ui.nav_down = true;
-                break;
-            case SDLK_LEFT:
-                ui.nav_left = true;
-                break;
-            case SDLK_RIGHT:
-                ui.nav_right = true;
-                break;
             case SDLK_TAB:
                 if (mods & ::ui::UI_KEY_MOD_SHIFT)
                     ui.nav_previous = true;

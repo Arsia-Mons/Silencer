@@ -116,6 +116,12 @@ public:
 	// Per-frame evaluator. kb is SDL_GetKeyboardState's array.
 	bool IsPressed(Action a, const Uint8* kb, const GamepadState& gp) const;
 
+	// Key-down-edge evaluator: true when a binding of `a` contains keyboard
+	// scancode `sc` and every key of that binding is held per kb. Call from a
+	// key-down of `sc` so the action fires only on the press that completes
+	// its chord, not while its keys merely stay held.
+	bool IsPressedByScancode(Action a, int sc, const Uint8* kb) const;
+
 	// Direct accessor — used by the controls UI and CLI dispatch.
 	ActionBindings& Get(Action a)       { return actions_[(int)a]; }
 	const ActionBindings& Get(Action a) const { return actions_[(int)a]; }
