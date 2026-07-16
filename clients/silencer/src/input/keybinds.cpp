@@ -199,6 +199,23 @@ bool KeyMap::IsPressed(Action a, const Uint8* kb, const GamepadState& gp) const 
 	return false;
 }
 
+bool KeyMap::IsPressedByScancode(Action a, int sc, const Uint8* kb) const {
+	const ActionBindings& ab = actions_[(int)a];
+	for (const Binding& b : ab.bindings) {
+		bool contains = false;
+		for (const BindingKey& k : b.keys) {
+			if (k.device == BindingDevice::Keyboard && k.code == sc) { contains = true; break; }
+		}
+		if (!contains) continue;
+		bool all = true;
+		for (const BindingKey& k : b.keys) {
+			if (k.device != BindingDevice::Keyboard || !kb || !kb[k.code]) { all = false; break; }
+		}
+		if (all) return true;
+	}
+	return false;
+}
+
 // Parse a single binding entry: either a string (single key) or an array of
 // strings (chord). Returns false on any unparseable string.
 static bool ParseBinding(const json& je, Binding& out) {

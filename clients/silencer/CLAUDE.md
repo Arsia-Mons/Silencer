@@ -122,6 +122,12 @@ Raw SDL events are consumed in exactly one place: `src/game/session/events.cpp`
   screens read interaction state via the runtime hooks (`use_focused`,
   `use_hovered`, `use_pressed`). The cppx UI currently polls the pointer
   directly; full nav/text wiring lands with the interactive screens.
+  Directional nav edges follow the keymap (`ui_up`/`ui_down`/`ui_left`/
+  `ui_right` via `KeyMap::IsPressedByScancode`) — arrows work because the
+  default profile binds them, not because they're hardcoded. Printable keys
+  never emit nav while a text field is focused (`WantsTextInput()`); they
+  arrive as TEXT_INPUT and must type instead (#315). Tab/Enter/Space/Escape
+  edges stay fixed. The TUI scancode path mirrors the same contract.
 
 Text-input platform gating (`SDL_StartTextInput`/`StopTextInput`) is owned by
 `GameUiPipeline`, gated on `ClientUi::wants_text_input()`. Never call SDL
