@@ -163,10 +163,12 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
         case ::ui::UiKey::Backspace:
           erase_back(*state, next);
           publish_change(on_change, next);
+          value = next;
           break;
         case ::ui::UiKey::DeleteForward:
           erase_forward(*state, next);
           publish_change(on_change, next);
+          value = next;
           break;
         case ::ui::UiKey::Left:
           move_caret(*state, state->caret - 1, value_length(next), extend);
@@ -209,6 +211,7 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
     clamp_state(*state, value_length(next));
     replace_selection_or_insert(*state, next, event.text);
     publish_change(on_change, next);
+    value = next;
   };
   callbacks.on_text_editing = [state, original = callbacks.on_text_editing](
                                   const ::ui::TextEditingEvent &event) {

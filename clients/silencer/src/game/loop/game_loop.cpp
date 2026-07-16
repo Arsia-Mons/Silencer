@@ -89,9 +89,6 @@ void FeedTuiUiScancodeDown(Game & game, SDL_Scancode sc, const Uint8 * newkeysta
 		::ui::ui_input_push_key(ui, key, mods, false);
 		fedUi = true;
 	}
-	// Directional UI nav follows the keymap; printable keys are exempt while a
-	// text field is focused so they type instead of navigating (#315). Mirrors
-	// the windowed path in session/events.cpp.
 	const bool printable = TuiPrintableFromScancode(sc, mods) != '\0';
 	if(!(printable && routeTextInput)){
 		const KeyMap & km = game.GetKeyMap();
