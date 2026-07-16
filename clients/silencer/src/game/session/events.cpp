@@ -115,11 +115,6 @@ bool Game::HandleSDLEvents() {
             if (k != ::ui::UiKey::Unknown) {
                 ::ui::ui_input_push_key(ui, k, mods, event.key.repeat);
             }
-            // Directional UI nav follows the keymap (ui_up/ui_down/ui_left/
-            // ui_right), so arrows navigate only while bound and W/S-style
-            // bindings work. Printable keys are exempt while a text field is
-            // focused: they arrive as TEXT_INPUT and must type, not navigate
-            // (#315 — wasd profile binds letters to nav).
             {
                 const bool printable = event.key.key >= SDLK_SPACE &&
                                        !(event.key.key & SDLK_SCANCODE_MASK);
