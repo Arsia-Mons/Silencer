@@ -76,3 +76,4 @@ clients/silencer/build_test/
 clients/silencer/installer/Output/
 clients/silencer/Testing/
 tools/refactor-baselines/
+.silencer-vault-pass
