@@ -371,6 +371,10 @@ bool tessellate_rect_fill(const DrawRect &rect, float corner_radius, Color fill,
                    [fill](float, float) { return fill; }, feather);
 }
 
+bool fill_is_hard_quad(const DrawRect &rect, float corner_radius) {
+  return clamp_radius(rect, corner_radius) <= kRadiusEps;
+}
+
 // ---------------------------------------------------------------------------
 // gradient_fill_colors
 // ---------------------------------------------------------------------------
@@ -414,6 +418,68 @@ bool bridge_rings(const RingPt *a, const RingPt *b, int n, MeshSink &sink,
                    vtx(b[j].x, b[j].y, color_b(b[j].x, b[j].y)),
                    vtx(b[i].x, b[i].y, color_b(b[i].x, b[i].y))))
       return false;
+  }
+  return true;
+}
+
+bool tessellate_rect_fill_ring(const DrawRect &rect, float corner_radius,
+                               Color fill, MeshSink &sink, float feather,
+                               const DrawRect &hole) {
+  const float radius = clamp_radius(rect, corner_radius);
+  if (radius <= kRadiusEps)
+    return false; // hard quad: nothing rounded to keep — span the whole rect
+  auto shade = [fill](float, float) { return fill; };
+
+  const int seg = seg_for_radius(radius);
+
+  // Mirror emit_fill's ring setup exactly so the emitted arcs/fringe are the
+  // ones the plain fill would draw.
+  DrawRect core_rect = rect;
+  float core_radius = radius;
+  float half = 0.f;
+  if (feather > 0.f) {
+    const float half_min = 0.5f * (rect.w < rect.h ? rect.w : rect.h);
+    half = clamp_half_feather(feather, half_min);
+    core_rect = grow_rect(rect, -half);
+    core_radius = radius - half;
+  }
+
+  // The hole must sit inside the rounded core: the core rect inset by the
+  // core radius is entirely within the rounded silhouette, so bound it there.
+  const float inset = core_radius > 0.f ? core_radius : 0.f;
+  if (hole.w <= 0.f || hole.h <= 0.f || hole.x < core_rect.x + inset ||
+      hole.y < core_rect.y + inset ||
+      hole.x + hole.w > core_rect.x + core_rect.w - inset ||
+      hole.y + hole.h > core_rect.y + core_rect.h - inset)
+    return false;
+
+  RingPt core[kMaxRingPts];
+  RingPt hole_ring[kMaxRingPts];
+  const int nc = build_ring_seg(core_rect, core_radius, seg, core, kMaxRingPts);
+  // Same seg on a radius-0 ring: matching topology, corners collapsed (the
+  // emit_band trick), so the bridge pairs cleanly.
+  const int nh = build_ring_seg(hole, 0.f, seg, hole_ring, kMaxRingPts);
+  if (nc < 3 || nh != nc)
+    return false;
+  if (!bridge_rings(core, hole_ring, nc, sink, shade, shade))
+    return false;
+
+  if (feather > 0.f) {
+    RingPt edge[kMaxRingPts];
+    const int ne = build_ring_seg(grow_rect(rect, half), radius + half, seg,
+                                  edge, kMaxRingPts);
+    if (ne != nc)
+      return false;
+    // Fringe: core (full shade) -> edge (premultiplied transparent), exactly
+    // as emit_fill's feathered path.
+    for (int i = 0; i < nc; ++i) {
+      const int j = (i + 1) % nc;
+      if (!sink.quad(vtx(core[i].x, core[i].y, shade(core[i].x, core[i].y)),
+                     vtx(core[j].x, core[j].y, shade(core[j].x, core[j].y)),
+                     vtx(edge[j].x, edge[j].y, kClear),
+                     vtx(edge[i].x, edge[i].y, kClear)))
+        return false;
+    }
   }
   return true;
 }

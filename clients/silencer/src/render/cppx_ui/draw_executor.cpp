@@ -363,6 +363,89 @@ struct LayerSlot {
   float opacity = 1.f;
 };
 
+// Span-blitter fast path for solid fills that tessellate to the hard-edged
+// constant-color quad (fill_is_hard_quad: no ring, no fringe). Eligibility is
+// exactly the cases where FillRect provably writes the same bytes the two
+// triangles would: integer device edges (within epsilon), so pixel centers at
+// +.5 select the identical pixel set under center-inside triangle coverage and
+// FillRect's [x0,x1) coverage, and the two rasterizers' fractional-edge
+// rounding rules never come into play. Alpha doesn't gate: a constant-color
+// blended fill and the SW triangle rasterizer blend through the same
+// SDL_draw.h macro family, so the per-pixel arithmetic matches (pinned by the
+// A/B sweep in draw_executor_tests + the goldens). Fractional edges fall back
+// to the mesh. This is the #331 throughput fix: solid fills were ~97% of CPU
+// repaint cost via the per-pixel SW triangle rasterizer (~40 Mpx/s); the fill
+// blitter is span-class.
+bool span_solid_fill(SDL_Renderer *r, const ::ui::DrawCommand &c, float scale) {
+  const ::ui::RectData &rd = c.payload.rect;
+  if (!::ui::fill_is_hard_quad(c.rect, rd.corner_radius))
+    return false;
+  const float e[4] = {c.rect.x * scale, c.rect.y * scale,
+                      (c.rect.x + c.rect.w) * scale,
+                      (c.rect.y + c.rect.h) * scale};
+  float snapped[4];
+  for (int i = 0; i < 4; ++i) {
+    snapped[i] = roundf(e[i]);
+    if (fabsf(e[i] - snapped[i]) > 0.001f)
+      return false;
+  }
+  if (snapped[2] <= snapped[0] || snapped[3] <= snapped[1])
+    return false; // degenerate: let the mesh path decide coverage
+  // Opaque premultiplied SrcOver is exactly dst=src, but SDL's blend-mode fill
+  // still runs per-pixel blend arithmetic (~500 Mpx/s measured); the NONE-mode
+  // fill is the memset-class fast path (~30x). Same bytes, so overwrite.
+  const bool opaque = rd.fill.a == 255;
+  if (opaque)
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(r, rd.fill.r, rd.fill.g, rd.fill.b, rd.fill.a);
+  const SDL_FRect fr = {snapped[0], snapped[1], snapped[2] - snapped[0],
+                        snapped[3] - snapped[1]};
+  SDL_RenderFillRect(r, &fr);
+  if (opaque)
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
+  return true;
+}
+
+// Rounded companion to span_solid_fill: mesh only the rounded ring + fringe
+// (tessellate_rect_fill_ring) and span-fill the integer interior hole. Byte-
+// equivalent to the plain fan: the hole edges land on integer device px so
+// pixel centers (+.5) never straddle the seam, the bridge quads carry the same
+// constant color the fan would interpolate, and the hole write uses the same
+// blend arithmetic as the triangles (NONE overwrite when opaque). Profiled
+// motivation: one rounded translucent 280x500pt panel cost 73 ms/pass at 4x
+// through the fan. Skipped (mesh fallback) when the interior is too small to
+// matter.
+bool span_ring_fill(SDL_Renderer *r, const ::ui::DrawCommand &c, Scratch &s,
+                    float scale, float feather) {
+  const ::ui::RectData &rd = c.payload.rect;
+  // Conservative interior inset (points): unclamped radius + full feather + a
+  // 2-device-px margin bounds the geometry-side core inset from above, so a
+  // hole built here always passes tessellate_rect_fill_ring's safety check.
+  const float inset = rd.corner_radius + feather + 2.f / scale;
+  const float x0 = ceilf((c.rect.x + inset) * scale);
+  const float y0 = ceilf((c.rect.y + inset) * scale);
+  const float x1 = floorf((c.rect.x + c.rect.w - inset) * scale);
+  const float y1 = floorf((c.rect.y + c.rect.h - inset) * scale);
+  if (x1 - x0 < 32.f || y1 - y0 < 32.f)
+    return false; // interior too small to beat one fan
+  const ::ui::DrawRect hole = {x0 / scale, y0 / scale, (x1 - x0) / scale,
+                               (y1 - y0) / scale};
+  ::ui::MeshSink sink{s.v, kVScratch, 0, s.i, kIScratch, 0};
+  if (!::ui::tessellate_rect_fill_ring(c.rect, rd.corner_radius, rd.fill, sink,
+                                       feather, hole))
+    return false; // hole rejected: caller re-tessellates into a fresh sink
+  const bool opaque = rd.fill.a == 255;
+  if (opaque)
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(r, rd.fill.r, rd.fill.g, rd.fill.b, rd.fill.a);
+  const SDL_FRect fr = {x0, y0, x1 - x0, y1 - y0};
+  SDL_RenderFillRect(r, &fr);
+  if (opaque)
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
+  submit(r, sink, s, scale);
+  return true;
+}
+
 // Legacy hairline frame snap: origin's 1-virtual-px strokes magnify into
 // alternating 2/3-px device bands whose width/position depend on absolute
 // virtual coordinate, which a uniform-width border can't reproduce. Band
@@ -457,11 +540,16 @@ void execute_draw_commands(SDL_Renderer *renderer,
       if (c.payload.rect.fill.a > 0) {
         if (snap_legacy_solid_fill(renderer, c, scale))
           break;
+        if (raster.span_solid_fills && span_solid_fill(renderer, c, scale))
+          break;
         if (use_sdf && c.payload.rect.corner_radius > 0.5f) {
           sdf_fill_rounded(renderer, sdf_cache, c.rect,
                            c.payload.rect.corner_radius, c.payload.rect.fill,
                            scale);
         } else {
+          if (raster.span_solid_fills &&
+              span_ring_fill(renderer, c, scratch, scale, feather))
+            break;
           ::ui::tessellate_rect_fill(c.rect, c.payload.rect.corner_radius,
                                      c.payload.rect.fill, sink, feather);
           submit(renderer, sink, scratch, scale);
