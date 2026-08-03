@@ -44,6 +44,11 @@ struct RasterConfig {
   // Within the rect the output is byte-identical to an unclipped execute; the
   // caller owns clearing the rect first (execute never clears).
   const SDL_Rect *damage = nullptr;
+  // Route opaque hard-quad solid fills landing on integer device edges to
+  // SDL_RenderFillRect (span blitter) instead of SDL_RenderGeometry's per-pixel
+  // triangle rasterizer — byte-identical output, ~10x faster, and solid fills
+  // dominate CPU repaint cost (#331 profile). Off = always mesh (A/B tests).
+  bool span_solid_fills = true;
 };
 
 // Execute the IR. `scale` is device px per UI point (HiDPI / SSAA upsample).

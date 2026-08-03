@@ -97,6 +97,24 @@ int corner_segments(float radius);
 bool tessellate_rect_fill(const DrawRect &rect, float corner_radius, Color fill,
                           MeshSink &sink, float feather = 0.f);
 
+// True when tessellate_rect_fill would emit the hard-edged constant-color quad
+// (the clamped radius is under the ring threshold): no arcs, no fringe,
+// feather-independent. Renderers use this to route eligible fills to a span
+// blitter instead of the triangle rasterizer.
+bool fill_is_hard_quad(const DrawRect &rect, float corner_radius);
+
+// Ring-only variant of tessellate_rect_fill for ROUNDED fills: emits the same
+// core/edge rings and fringe, but leaves the axis-aligned `hole` unpainted —
+// the core ring bridges to the hole's ring (constant color) instead of fanning
+// the interior. The caller paints the hole itself (e.g. a span fill), so the
+// combined output is coverage- and color-equivalent to tessellate_rect_fill.
+// Returns false — emitting nothing — when the hole does not sit safely inside
+// the rounded core (or on sink overflow); the caller then falls back to the
+// plain fill. Constant fills only (a gradient interior can't be span-filled).
+bool tessellate_rect_fill_ring(const DrawRect &rect, float corner_radius,
+                               Color fill, MeshSink &sink, float feather,
+                               const DrawRect &hole);
+
 // Fused frame: per-side border bands + signed-offset outline ring (design
 // §9.4, §9.11). Border bands are inset from the border-box edge by each side's
 // width; corners use the same seg-tessellated arc, split radially between
