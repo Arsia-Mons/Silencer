@@ -6,6 +6,11 @@
 #include <cstdio>
 #include <cstring>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <netdb.h>
 #include <spawn.h>
@@ -15,8 +20,96 @@
 #include <unistd.h>
 
 extern char **environ;
+#endif
 
 namespace launcher {
+
+#ifdef _WIN32
+
+int tcp_ping(const std::string &host, int port, int timeout_ms) {
+  static bool wsa_ready = [] {
+    WSADATA wsa;
+    return WSAStartup(MAKEWORD(2, 2), &wsa) == 0;
+  }();
+  if (!wsa_ready)
+    return -1;
+
+  char portstr[16];
+  snprintf(portstr, sizeof(portstr), "%d", port);
+
+  addrinfo hints = {};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  addrinfo *res = nullptr;
+  if (getaddrinfo(host.c_str(), portstr, &hints, &res) != 0 || !res)
+    return -1;
+
+  ULONGLONG start = GetTickCount64();
+
+  int result_ms = -1;
+  for (addrinfo *ai = res; ai; ai = ai->ai_next) {
+    SOCKET fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+    if (fd == INVALID_SOCKET)
+      continue;
+
+    u_long nonblock = 1;
+    ioctlsocket(fd, FIONBIO, &nonblock);
+
+    int rc = connect(fd, ai->ai_addr, (int)ai->ai_addrlen);
+    bool connected = false;
+    if (rc == 0) {
+      connected = true;
+    } else if (WSAGetLastError() == WSAEWOULDBLOCK) {
+      fd_set wset;
+      FD_ZERO(&wset);
+      FD_SET(fd, &wset);
+      timeval tv;
+      tv.tv_sec = timeout_ms / 1000;
+      tv.tv_usec = (timeout_ms % 1000) * 1000;
+      if (select(0, nullptr, &wset, nullptr, &tv) > 0) {
+        int soerr = 0;
+        int len = sizeof(soerr);
+        if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&soerr, &len) == 0 && soerr == 0)
+          connected = true;
+      }
+    }
+    closesocket(fd);
+
+    if (connected) {
+      ULONGLONG ms = GetTickCount64() - start;
+      result_ms = (int)ms;
+      break;
+    }
+  }
+  freeaddrinfo(res);
+  return result_ms;
+}
+
+bool spawn_detached(const std::string &binary, const std::vector<std::string> &args) {
+  if (!is_executable_file(binary))
+    return false;
+
+  // CreateProcess takes one command line; quote each argument.
+  std::string cmdline = "\"" + binary + "\"";
+  for (const auto &a : args)
+    cmdline += " \"" + a + "\"";
+
+  STARTUPINFOA si = {};
+  si.cb = sizeof(si);
+  PROCESS_INFORMATION pi = {};
+  if (!CreateProcessA(binary.c_str(), &cmdline[0], nullptr, nullptr, FALSE,
+                      CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS, nullptr, nullptr,
+                      &si, &pi)) {
+    fprintf(stderr, "[launcher] CreateProcess(%s) failed: %lu\n", binary.c_str(),
+            GetLastError());
+    return false;
+  }
+  CloseHandle(pi.hThread);
+  CloseHandle(pi.hProcess);
+  return true;
+}
+
+#else // !_WIN32
 
 int tcp_ping(const std::string &host, int port, int timeout_ms) {
   char portstr[16];
@@ -94,6 +187,8 @@ bool spawn_detached(const std::string &binary, const std::vector<std::string> &a
   return true;
 }
 
+#endif // _WIN32
+
 std::string sha256_file_hex(const std::string &path) {
   FILE *fp = fopen(path.c_str(), "rb");
   if (!fp)
@@ -122,10 +217,16 @@ std::string sha256_file_hex(const std::string &path) {
 bool is_executable_file(const std::string &path) {
   if (path.empty())
     return false;
+#ifdef _WIN32
+  // No execute bit on Windows: a regular file is launchable.
+  DWORD attrs = GetFileAttributesA(path.c_str());
+  return attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY);
+#else
   struct stat st;
   if (stat(path.c_str(), &st) != 0)
     return false;
   return S_ISREG(st.st_mode) && (st.st_mode & S_IXUSR);
+#endif
 }
 
 } // namespace launcher

@@ -8,9 +8,16 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
+#ifdef _WIN32
+#include <direct.h>
+#define launcher_mkdir(p) _mkdir(p)
+#else
 #include <sys/stat.h>
+#define launcher_mkdir(p) mkdir(p, 0755)
+#endif
 
 namespace launcher {
 
@@ -23,9 +30,20 @@ void mkdir_p(const std::string &path) {
   for (size_t i = 0; i < path.size(); ++i) {
     cur += path[i];
     if (path[i] == '/' && cur.size() > 1)
-      mkdir(cur.c_str(), 0755);
+      launcher_mkdir(cur.c_str());
   }
-  mkdir(path.c_str(), 0755);
+  launcher_mkdir(path.c_str());
+}
+
+std::string temp_dir() {
+#ifdef _WIN32
+  const char *t = getenv("TEMP");
+  if (!t || !t[0])
+    t = getenv("TMP");
+  return (t && t[0]) ? std::string(t) : std::string(".");
+#else
+  return "/tmp";
+#endif
 }
 
 std::string to_lower(std::string s) {
@@ -91,7 +109,7 @@ std::string App::manifest_url_locked() const {
 
 std::string App::fetch_text(const std::string &url, const std::string &tmp_name,
                             int *http_status) {
-  const std::string path = std::string("/tmp/") + tmp_name;
+  const std::string path = temp_dir() + "/" + tmp_name;
   int http = 0;
   std::string err;
   UpdaterDownload::Result r =
@@ -223,7 +241,7 @@ void App::run_update() {
     update_bytes_total_.store(0);
   }
 
-  const std::string zip = "/tmp/silencer-launcher-update.zip";
+  const std::string zip = temp_dir() + "/silencer-launcher-update.zip";
   int http = 0;
   std::string err;
   UpdaterDownload::Result r =

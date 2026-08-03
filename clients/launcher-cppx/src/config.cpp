@@ -6,7 +6,14 @@
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
+#ifdef _WIN32
+#include <direct.h>
+#include <windows.h>
+#define launcher_mkdir(p) _mkdir(p)
+#else
 #include <sys/stat.h>
+#define launcher_mkdir(p) mkdir(p, 0755)
+#endif
 
 namespace launcher {
 
@@ -16,7 +23,14 @@ namespace {
 
 std::string home_dir() {
   const char *h = getenv("HOME");
-  return h && h[0] ? std::string(h) : std::string(".");
+  if (h && h[0])
+    return h;
+#ifdef _WIN32
+  h = getenv("USERPROFILE");
+  if (h && h[0])
+    return h;
+#endif
+  return ".";
 }
 
 void mkdir_p(const std::string &path) {
@@ -24,9 +38,9 @@ void mkdir_p(const std::string &path) {
   for (size_t i = 0; i < path.size(); ++i) {
     cur += path[i];
     if (path[i] == '/' && cur.size() > 1)
-      mkdir(cur.c_str(), 0755);
+      launcher_mkdir(cur.c_str());
   }
-  mkdir(path.c_str(), 0755);
+  launcher_mkdir(path.c_str());
 }
 
 } // namespace
@@ -37,7 +51,7 @@ std::string Config::dir_path() {
   const char *env = getenv("SILENCER_LAUNCHER_CONFIG");
   if (env && env[0]) {
     std::string p = env;
-    size_t slash = p.find_last_of('/');
+    size_t slash = p.find_last_of("/\\");
     return slash == std::string::npos ? std::string(".") : p.substr(0, slash);
   }
   return home_dir() + "/.config/silencer-launcher";
@@ -56,7 +70,11 @@ void Config::apply_defaults() {
   if (install_dir.empty())
     install_dir = home_dir() + "/.local/share/silencer-launcher";
   if (game_binary.empty())
+#ifdef _WIN32
+    game_binary = install_dir + "/Silencer.exe";
+#else
     game_binary = install_dir + "/Silencer.app/Contents/MacOS/Silencer";
+#endif
   if (servers.empty())
     servers.push_back({"Official", "lobby.arsiamons.com", 517});
   if (manifest_url_stable.empty())
@@ -145,7 +163,12 @@ bool Config::save() const {
     }
     out << j.dump(2) << "\n";
   }
+#ifdef _WIN32
+  // C rename() refuses to replace an existing file on Windows.
+  if (!MoveFileExA(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+#else
   if (rename(tmp.c_str(), path.c_str()) != 0) {
+#endif
     fprintf(stderr, "[launcher] cannot rename %s -> %s\n", tmp.c_str(), path.c_str());
     return false;
   }

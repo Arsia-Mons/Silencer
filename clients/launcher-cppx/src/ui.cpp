@@ -466,6 +466,15 @@ UiElement RootView(const RootProps &) {
   rootbox.layout.height = Length::percent(100.0f);
   rootbox.layout.padding = EdgeSizes{18, 18, 18, 18};
   rootbox.style = ::ui::patch().background(kBg);
+  if (vm.bg_texture) {
+    // Cover-fit the backdrop, dimmed so the phosphor text stays readable;
+    // index-0 pixels are transparent and read as the kBg fill beneath.
+    ::ui::BackgroundImage img{};
+    img.texture_id = vm.bg_texture;
+    img.tint = Color{110, 110, 110, 255};
+    img.fit = ::ui::ImageFit::Cover;
+    rootbox.style = ::ui::patch().background(kBg).image(img);
+  }
   rootbox.children = ::ui::children({top_bar(s, in), MkBox(body)});
   return MkBox(rootbox);
 }

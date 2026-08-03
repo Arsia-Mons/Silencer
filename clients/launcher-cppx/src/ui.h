@@ -31,6 +31,9 @@ struct Intents {
 struct ViewModel {
   const AppSnapshot *snap = nullptr;
   const Intents *intents = nullptr;
+  // Backdrop texture for this frame (0 = plain fill). main() owns the bake +
+  // the shuffle/cycle; the view just draws whatever id it is handed.
+  uint32_t bg_texture = 0;
 };
 
 extern ReactContext LauncherContext; // current = const ViewModel*

@@ -1,4 +1,5 @@
 #include "app.h"
+#include "backgrounds.h"
 #include "ui.h"
 
 #include "client/ui/app_shell/ui_pipeline.h"
@@ -14,9 +15,13 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <random>
 
 #ifndef LAUNCHER_FONT_DIR
 #define LAUNCHER_FONT_DIR "."
+#endif
+#ifndef LAUNCHER_ASSETS_DIR
+#define LAUNCHER_ASSETS_DIR "."
 #endif
 
 namespace {
@@ -24,6 +29,11 @@ namespace {
 const char *font_dir() {
   const char *env = getenv("SILENCER_LAUNCHER_FONT_DIR");
   return (env && env[0]) ? env : LAUNCHER_FONT_DIR;
+}
+
+const char *assets_dir() {
+  const char *env = getenv("SILENCER_LAUNCHER_ASSETS_DIR");
+  return (env && env[0]) ? env : LAUNCHER_ASSETS_DIR;
 }
 
 void handle_key(SDL_Keycode key, ::ui::UiInputFrame &in, bool &running) {
@@ -114,6 +124,21 @@ int main(int, char **) {
       [&vm](::ui::UiElement child) { return launcher::launcher_providers(child, &vm); });
   host.pipeline().client_ui().push_screen(launcher::make_launcher_screen());
 
+  // Backdrop: decode the curated sprite backdrops, keep one picked at random
+  // for the whole session. The texture is bound to the host's renderer, so it
+  // re-bakes whenever ensure() resets it.
+  std::vector<launcher::Background> bgs = launcher::load_backgrounds(assets_dir());
+  fprintf(stderr, "[launcher] backgrounds: %d loaded from %s\n", (int)bgs.size(),
+          assets_dir());
+  launcher::Background bg;
+  if (!bgs.empty()) {
+    std::mt19937 rng((unsigned)std::random_device{}());
+    bg = std::move(
+        bgs[std::uniform_int_distribution<size_t>(0, bgs.size() - 1)(rng)]);
+    bgs.clear();
+  }
+  uint32_t bg_id = 0;
+
   SDL_Texture *tex = nullptr;
   int tex_w = 0, tex_h = 0;
 
@@ -186,6 +211,17 @@ int main(int, char **) {
       fprintf(stderr, "PipelineHost::ensure failed (font dir: %s)\n", font_dir());
       running = false;
       break;
+    }
+
+    if (!bg.indices.empty()) {
+      if (host.chrome_needs_bake()) {
+        bg_id = host.bake_chrome_sprite(bg.indices.data(), bg.w, bg.h, bg.palette);
+        if (!bg_id)
+          fprintf(stderr, "[launcher] backgrounds: bake failed (%dx%d)\n", bg.w,
+                  bg.h);
+        host.mark_chrome_baked();
+      }
+      vm.bg_texture = bg_id;
     }
 
     client::ui::UiPipelineFrame frame = {};

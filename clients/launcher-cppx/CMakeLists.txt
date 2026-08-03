@@ -112,6 +112,7 @@ add_executable(silencer-launcher
   src/config.cpp
   src/net.cpp
   src/app.cpp
+  src/backgrounds.cpp
   src/ui.cpp
   ${CPPX_GENERATED}
   ${SIL_SOURCES})
@@ -135,15 +136,27 @@ target_include_directories(silencer-launcher SYSTEM PRIVATE "${SIL}/third_party"
 target_link_libraries(silencer-launcher PRIVATE
   SDL3::SDL3 SDL3_ttf::SDL3_ttf CURL::libcurl yogacore)
 
-# minizip is only needed by updaterzip.cpp off macOS (macOS shells out to ditto).
+# minizip is only needed by updaterzip.cpp off macOS (macOS shells out to
+# ditto). Same find chain as the client: vcpkg's CMake config first, then
+# pkg-config (Homebrew/apt).
 if(NOT APPLE)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(MINIZIP REQUIRED IMPORTED_TARGET minizip)
-  target_link_libraries(silencer-launcher PRIVATE PkgConfig::MINIZIP)
+  find_package(unofficial-minizip CONFIG QUIET)
+  if(TARGET unofficial::minizip::minizip)
+    target_link_libraries(silencer-launcher PRIVATE unofficial::minizip::minizip)
+  else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(MINIZIP REQUIRED IMPORTED_TARGET minizip)
+    target_link_libraries(silencer-launcher PRIVATE PkgConfig::MINIZIP)
+  endif()
+endif()
+
+if(WIN32)
+  target_link_libraries(silencer-launcher PRIVATE ws2_32)
 endif()
 
 target_compile_definitions(silencer-launcher PRIVATE
-  LAUNCHER_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../shared/fonts")
+  LAUNCHER_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../shared/fonts"
+  LAUNCHER_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../shared/assets")
 
 if(APPLE)
   set_target_properties(silencer-launcher PROPERTIES OUTPUT_NAME "SilencerLauncher")
