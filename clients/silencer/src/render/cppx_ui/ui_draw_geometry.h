@@ -73,4 +73,11 @@ void image_plain_rects(::ui::DrawRect rect, float scale, float tw, float th,
                        bool has_src, ::ui::DrawRect src_sub, ::ui::ImageFit fit,
                        DevRect *src_out, DevRect *dst_out);
 
+// Conservative device-px bounds of every pixel `c` can touch — damage tracking.
+// Deliberately generous (AA feather, legacy grid re-quantization, glyph cell
+// overhang past the line box, shadow offset+spread+blur, outline outsets): a
+// too-big rect only over-paints, a too-small one leaves stale pixels. Zero-size
+// for kinds that draw nothing themselves (Clip*/Layer*/None).
+DevRect command_damage_bounds(const ::ui::DrawCommand &c, float scale);
+
 } // namespace silencer::cppx_ui

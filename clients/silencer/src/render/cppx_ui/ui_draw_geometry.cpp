@@ -203,4 +203,45 @@ void image_plain_rects(::ui::DrawRect rect, float scale, float tw, float th,
   *dst_out = dst;
 }
 
+DevRect command_damage_bounds(const ::ui::DrawCommand &c, float scale) {
+  float pad; // device px beyond the scaled rect
+  switch (c.kind) {
+  case ::ui::DrawCommandKind::Rect:
+  case ::ui::DrawCommandKind::Gradient:
+    pad = 2.f; // fringe feather (1 device px) + fractional-edge rounding
+    break;
+  case ::ui::DrawCommandKind::Border: {
+    // Borders stroke inside the box; a positive-offset outline outsets by
+    // offset + its own width. Legacy hairline snap stays within the +-2 slack.
+    const ::ui::Outline &o = c.payload.border.outline;
+    const float outset = o.width + (o.offset > 0.f ? o.offset : 0.f);
+    pad = 2.f + outset * scale;
+    break;
+  }
+  case ::ui::DrawCommandKind::Text:
+    // Glyph cells overhang the line box (atlas_h > line_height scales the cell
+    // past rect.h) and the TTF fallback blits the rendered surface size, not
+    // the rect; one full cell height of pad covers both, every face.
+    pad = c.payload.text.font_size * scale + 8.f;
+    break;
+  case ::ui::DrawCommandKind::Image: {
+    // resolve_legacy re-quantizes dst onto the virtual grid (< 2 virtual px of
+    // drift); the native-1:1 snap moves edges by < 1 px.
+    const float sv = legacy_virtual_scale(scale);
+    pad = 2.f + (sv > 0.f ? 2.f * sv : 0.f);
+    break;
+  }
+  case ::ui::DrawCommandKind::Shadow: {
+    const ::ui::ShadowData &s = c.payload.shadow;
+    const float off = std::max(std::fabs(s.offset.x), std::fabs(s.offset.y));
+    pad = 2.f + (s.blur + s.spread + off) * scale;
+    break;
+  }
+  default:
+    return {0.f, 0.f, 0.f, 0.f}; // ClipPush/Pop, LayerPush/Pop, None, Custom
+  }
+  return {c.rect.x * scale - pad, c.rect.y * scale - pad,
+          c.rect.w * scale + 2.f * pad, c.rect.h * scale + 2.f * pad};
+}
+
 } // namespace silencer::cppx_ui

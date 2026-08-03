@@ -4,6 +4,7 @@
 #include "draw_executor.h"
 #include "sprite_bake.h"
 #include "text_measure.h"
+#include "ui_draw_geometry.h"
 #include "ui_draw_program_builder.h"
 
 #ifndef SILENCER_HEADLESS
@@ -11,6 +12,8 @@
 #endif
 
 #include <cstring>
+#include <math.h>
+#include <stdlib.h>
 
 namespace silencer::cppx_ui {
 
@@ -74,8 +77,9 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
   w_ = w;
   h_ = h;
   packed_.assign((size_t)w * h * 4u, 0);
-  packed_valid_ = false; // new surface size: cached frame is stale
-  last_ir_sig_ = 0;
+  prev_valid_ = false; // new surface size: cached frame + prev IR are stale
+  const char *dmg_env = getenv("SILENCER_UI_DAMAGE");
+  damage_enabled_ = !(dmg_env && dmg_env[0] == '0');
   return true;
 }
 
@@ -123,36 +127,173 @@ bool PipelineHost::build_glyph_color_face(int face_id, uint8_t key_r,
 
 namespace {
 
-// FNV-1a over the used prefix of the draw IR arenas (POD, so a raw-byte hash
-// captures every visible change). A false "changed" only costs a redundant
-// raster; a collision-driven false "unchanged" is astronomically unlikely.
-uint64_t ir_signature(const ::ui::DrawCommandList &list) {
-  uint64_t h = 1469598103934665603ull;
-  auto mix_bytes = [&](const void *p, size_t n) {
-    const uint8_t *b = static_cast<const uint8_t *>(p);
-    for (size_t i = 0; i < n; ++i) {
-      h ^= b[i];
-      h *= 1099511628211ull;
+// Pixel-equality of one command across frames, arenas dereferenced: Text/
+// Gradient arms hold arena OFFSETS that shift whenever any earlier string or
+// stop run changes size, so equality must compare the referenced bytes, never
+// the handles — else one changed label false-damages everything packed after
+// it. node_id is an identity tag with no pixel effect and is excluded. The
+// other arms memcmp their active member only (the union tail beyond it is
+// unspecified bytes); a spurious mismatch there just over-paints.
+bool command_pixels_equal(const ::ui::DrawCommand &a, const char *a_text,
+                          const ::ui::GradientStop *a_grads,
+                          const ::ui::DrawCommand &b, const char *b_text,
+                          const ::ui::GradientStop *b_grads) {
+  if (a.kind != b.kind)
+    return false;
+  if (memcmp(&a.rect, &b.rect, sizeof(a.rect)) != 0)
+    return false;
+  switch (a.kind) {
+  case ::ui::DrawCommandKind::Text: {
+    const ::ui::TextData &ta = a.payload.text;
+    const ::ui::TextData &tb = b.payload.text;
+    if (ta.text_len != tb.text_len ||
+        memcmp(&ta.color, &tb.color, sizeof(ta.color)) != 0 ||
+        ta.font_id != tb.font_id || ta.font_size != tb.font_size ||
+        ta.line_index != tb.line_index || ta.align != tb.align ||
+        ta.reveal_boost != tb.reveal_boost || ta.reveal_step != tb.reveal_step)
+      return false;
+    return ta.text_len == 0 ||
+           memcmp(a_text + ta.text_off, b_text + tb.text_off, ta.text_len) == 0;
+  }
+  case ::ui::DrawCommandKind::Gradient: {
+    const ::ui::GradientData &ga = a.payload.gradient;
+    const ::ui::GradientData &gb = b.payload.gradient;
+    if (ga.stop_count != gb.stop_count || ga.angle_deg != gb.angle_deg ||
+        ga.corner_radius != gb.corner_radius)
+      return false;
+    return ga.stop_count == 0 ||
+           memcmp(a_grads + ga.stop_off, b_grads + gb.stop_off,
+                  (size_t)ga.stop_count * sizeof(::ui::GradientStop)) == 0;
+  }
+  case ::ui::DrawCommandKind::Rect:
+    return memcmp(&a.payload.rect, &b.payload.rect,
+                  sizeof(::ui::RectData)) == 0;
+  case ::ui::DrawCommandKind::Border:
+    return memcmp(&a.payload.border, &b.payload.border,
+                  sizeof(::ui::BorderData)) == 0;
+  case ::ui::DrawCommandKind::Image:
+    return memcmp(&a.payload.image, &b.payload.image,
+                  sizeof(::ui::ImageData)) == 0;
+  case ::ui::DrawCommandKind::Shadow:
+    return memcmp(&a.payload.shadow, &b.payload.shadow,
+                  sizeof(::ui::ShadowData)) == 0;
+  case ::ui::DrawCommandKind::ClipPush:
+  case ::ui::DrawCommandKind::ClipPop:
+    return memcmp(&a.payload.clip, &b.payload.clip,
+                  sizeof(::ui::ClipData)) == 0;
+  case ::ui::DrawCommandKind::LayerPush:
+  case ::ui::DrawCommandKind::LayerPop:
+    return memcmp(&a.payload.layer, &b.payload.layer,
+                  sizeof(::ui::LayerData)) == 0;
+  default:
+    return true; // None/Custom: no payload, no pixels
+  }
+}
+
+bool is_bracket(::ui::DrawCommandKind k) {
+  return k == ::ui::DrawCommandKind::ClipPush ||
+         k == ::ui::DrawCommandKind::ClipPop ||
+         k == ::ui::DrawCommandKind::LayerPush ||
+         k == ::ui::DrawCommandKind::LayerPop;
+}
+
+SDL_Rect union_rect(const SDL_Rect &a, const SDL_Rect &b) {
+  const int x0 = a.x < b.x ? a.x : b.x;
+  const int y0 = a.y < b.y ? a.y : b.y;
+  const int x1 = (a.x + a.w) > (b.x + b.w) ? a.x + a.w : b.x + b.w;
+  const int y1 = (a.y + a.h) > (b.y + b.h) ? a.y + a.h : b.y + b.h;
+  return {x0, y0, x1 - x0, y1 - y0};
+}
+
+// Clamp a conservative device-px bound into the surface and fold it into the
+// set: union into the first intersecting rect, else a free slot, else the slot
+// whose union grows least. (Merge policy is perf-only — the raster pass is
+// correct for overlapping rects — so first-fit is fine.)
+void add_damage(UiDamage &d, const DevRect &b, int w, int h) {
+  int x0 = (int)floorf(b.x), y0 = (int)floorf(b.y);
+  int x1 = (int)ceilf(b.x + b.w), y1 = (int)ceilf(b.y + b.h);
+  if (x0 < 0)
+    x0 = 0;
+  if (y0 < 0)
+    y0 = 0;
+  if (x1 > w)
+    x1 = w;
+  if (y1 > h)
+    y1 = h;
+  if (x1 <= x0 || y1 <= y0)
+    return;
+  const SDL_Rect r = {x0, y0, x1 - x0, y1 - y0};
+  for (int i = 0; i < d.count; ++i) {
+    if (SDL_HasRectIntersection(&d.rects[i], &r)) {
+      d.rects[i] = union_rect(d.rects[i], r);
+      return;
     }
-  };
-  const int count = list.count;
-  mix_bytes(&count, sizeof(count));
-  mix_bytes(list.commands, (size_t)(count > 0 ? count : 0) * sizeof(list.commands[0]));
-  const int text_len = list.text_len_used;
-  mix_bytes(&text_len, sizeof(text_len));
-  mix_bytes(list.text_arena, (size_t)(text_len > 0 ? text_len : 0));
-  const int grad = list.grad_count;
-  mix_bytes(&grad, sizeof(grad));
-  mix_bytes(list.grad_arena, (size_t)(grad > 0 ? grad : 0) * sizeof(list.grad_arena[0]));
-  return h;
+  }
+  if (d.count < UiDamage::kMaxRects) {
+    d.rects[d.count++] = r;
+    return;
+  }
+  int best = 0;
+  long best_growth = 0x7fffffffL;
+  for (int i = 0; i < d.count; ++i) {
+    const SDL_Rect u = union_rect(d.rects[i], r);
+    const long growth = (long)u.w * u.h - (long)d.rects[i].w * d.rects[i].h;
+    if (growth < best_growth) {
+      best_growth = growth;
+      best = i;
+    }
+  }
+  d.rects[best] = union_rect(d.rects[best], r);
 }
 
 } // namespace
 
+// Diff the new IR against the retained previous frame and build the damage
+// set. Full damage when there is no comparable previous frame (first frame,
+// resize, scale change), the command count changed (structural reshape — the
+// positional diff would mis-pair everything after the first insertion), any
+// bracket command changed (a moved clip/layer boundary exposes pixels no draw
+// command's bounds own), the kill switch is set, or the damaged area stops
+// being worth multiple passes. count==0 && !full => byte-identical frame.
+void PipelineHost::diff_damage(const ::ui::DrawCommandList &list, float scale,
+                               UiDamage *out) {
+  if (!prev_valid_ || prev_scale_ != scale ||
+      list.count != (int)prev_cmds_.size()) {
+    out->full = true;
+    return;
+  }
+  bool any = false;
+  for (int i = 0; i < list.count; ++i) {
+    const ::ui::DrawCommand &prev = prev_cmds_[i];
+    const ::ui::DrawCommand &next = list.commands[i];
+    if (command_pixels_equal(prev, prev_text_.data(), prev_grads_.data(), next,
+                             list.text_arena, list.grad_arena))
+      continue;
+    any = true;
+    if (!damage_enabled_ || is_bracket(prev.kind) || is_bracket(next.kind)) {
+      out->full = true;
+      return;
+    }
+    // Both the pixels the command used to cover and the ones it covers now.
+    add_damage(*out, command_damage_bounds(prev, scale), w_, h_);
+    add_damage(*out, command_damage_bounds(next, scale), w_, h_);
+  }
+  if (!any)
+    return; // unchanged
+  long area = 0;
+  for (int i = 0; i < out->count; ++i)
+    area += (long)out->rects[i].w * out->rects[i].h;
+  if (out->count == 0 || area > ((long)w_ * h_ * 6) / 10)
+    out->full = true;
+}
+
 const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
-                                    int *out_w, int *out_h, bool *out_unchanged) {
+                                    int *out_w, int *out_h, bool *out_unchanged,
+                                    UiDamage *out_damage) {
   if (out_unchanged)
     *out_unchanged = false;
+  if (out_damage)
+    *out_damage = {};
   if (!surf_ || !r_ || !pipeline_)
     return nullptr;
 
@@ -168,27 +309,75 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   pipeline_->render_client_ui_frame(frame, [&] {
     const ::ui::DrawCommandList &list =
         pipeline_->client_ui().retained_command_list();
-    const uint64_t sig = ir_signature(list);
-    if (packed_valid_ && sig == last_ir_sig_) {
+
+    UiDamage dmg;
+    diff_damage(list, device_scale, &dmg);
+    if (!dmg.full && dmg.count == 0) {
       unchanged = true;
       return;
     }
+
     PERF_SCOPE("ui.raster");
-    // Transparent clear: the UI composites over the already-rendered world.
-    const float scale =
-        ui_.begin_frame(::ui::Color{0, 0, 0, 0}, device_scale, 1);
-    execute_draw_commands(r_, list, &fonts_, &textures_, scale, {},
-                          &glyph_fonts_);
-    ui_.resolve_frame();
-    ui_.present();
-    // Copy to a tightly-packed buffer (the surface pitch may be padded).
     const int pitch = surf_->pitch;
     const uint8_t *src = (const uint8_t *)surf_->pixels;
-    for (int y = 0; y < h_; ++y)
-      memcpy(&packed_[(size_t)y * w_ * 4u], src + (size_t)y * pitch,
-             (size_t)w_ * 4u);
-    last_ir_sig_ = sig;
-    packed_valid_ = true;
+    if (dmg.full) {
+      // Transparent clear: the UI composites over the already-rendered world.
+      const float scale =
+          ui_.begin_frame(::ui::Color{0, 0, 0, 0}, device_scale, 1);
+      execute_draw_commands(r_, list, &fonts_, &textures_, scale, {},
+                            &glyph_fonts_);
+      ui_.resolve_frame();
+      ui_.present();
+      // Copy to a tightly-packed buffer (the surface pitch may be padded).
+      for (int y = 0; y < h_; ++y)
+        memcpy(&packed_[(size_t)y * w_ * 4u], src + (size_t)y * pitch,
+               (size_t)w_ * 4u);
+    } else {
+      // Region repaint: overwrite-clear each damage rect, then re-execute the
+      // full list clipped to it — painter order inside the rect reproduces the
+      // full-repaint pixels exactly. Clear-then-execute stays sequential per
+      // rect so an overlapping later rect rebuilds the overlap from its own
+      // clear instead of double-blending the earlier pass's pixels.
+      for (int i = 0; i < dmg.count; ++i) {
+        const SDL_Rect &dr = dmg.rects[i];
+        SDL_SetRenderDrawBlendMode(r_, SDL_BLENDMODE_NONE);
+        SDL_SetRenderDrawColor(r_, 0, 0, 0, 0);
+        const SDL_FRect fr = {(float)dr.x, (float)dr.y, (float)dr.w,
+                              (float)dr.h};
+        SDL_RenderFillRect(r_, &fr);
+        RasterConfig rc;
+        rc.damage = &dr;
+        execute_draw_commands(r_, list, &fonts_, &textures_, device_scale, rc,
+                              &glyph_fonts_);
+      }
+      ui_.resolve_frame();
+      ui_.present();
+      for (int i = 0; i < dmg.count; ++i) {
+        const SDL_Rect &dr = dmg.rects[i];
+        for (int y = dr.y; y < dr.y + dr.h; ++y)
+          memcpy(&packed_[((size_t)y * w_ + dr.x) * 4u],
+                 src + (size_t)y * pitch + (size_t)dr.x * 4u,
+                 (size_t)dr.w * 4u);
+      }
+    }
+
+    prev_cmds_.assign(list.commands, list.commands + list.count);
+    prev_text_.assign(list.text_arena, list.text_arena + list.text_len_used);
+    prev_grads_.assign(list.grad_arena, list.grad_arena + list.grad_count);
+    prev_scale_ = device_scale;
+    prev_valid_ = true;
+
+    if (out_damage) {
+      out_damage->full = dmg.full;
+      if (dmg.full) {
+        out_damage->count = 1;
+        out_damage->rects[0] = {0, 0, w_, h_};
+      } else {
+        out_damage->count = dmg.count;
+        for (int i = 0; i < dmg.count; ++i)
+          out_damage->rects[i] = dmg.rects[i];
+      }
+    }
   });
 
   if (out_unchanged)
