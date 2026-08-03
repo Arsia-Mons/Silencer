@@ -79,7 +79,13 @@ bool FontRegistry::load_faces(const char *font_dir) {
     if (!faces_[i]) {
       SDL_Log("FontRegistry: TTF_OpenFont(%s) failed: %s", path, SDL_GetError());
       ok = false;
+      continue;
     }
+    // These faces are generated pixel fonts (each pixel a 1x1-em square
+    // outline). FreeType's hinter grid-fits those squares and collapses or
+    // doubles rows at any size that isn't the native em, which reads as
+    // horizontal banding. Pure geometric scaling is always right for them.
+    TTF_SetFontHinting(faces_[i], TTF_HINTING_NONE);
   }
   return ok;
 }
