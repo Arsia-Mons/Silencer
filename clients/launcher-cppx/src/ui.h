@@ -1,0 +1,50 @@
+#ifndef LAUNCHER_UI_H
+#define LAUNCHER_UI_H
+
+#include "app.h"
+
+#include "ui/runtime/element.h"
+#include "ui/runtime/react.h"
+#include "ui/style/theme.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+
+namespace client::ui {
+class UiScreen;
+}
+
+namespace launcher {
+
+// Named intent closures the UI calls; bound once by main() to the App.
+struct Intents {
+  std::function<void(const std::string &)> set_channel;
+  std::function<void()> refresh;
+  std::function<void()> start_update;
+  std::function<void(int)> select_server;
+  std::function<void()> play;
+};
+
+// What the view reads for one frame: a snapshot pointer + the intents. Delivered
+// to the tree via LauncherContext (a normal ReactContext), read by use_launcher.
+struct ViewModel {
+  const AppSnapshot *snap = nullptr;
+  const Intents *intents = nullptr;
+};
+
+extern ReactContext LauncherContext; // current = const ViewModel*
+
+const ViewModel &use_launcher();
+
+const ::ui::Theme &launcher_theme();
+
+// Wraps the screen root with the theme + launcher-view-model providers. Passed
+// to UiPipeline::set_frame_provider; `vm` must stay valid for the frame.
+::ui::UiElement launcher_providers(::ui::UiElement child, const ViewModel *vm);
+
+std::unique_ptr<client::ui::UiScreen> make_launcher_screen();
+
+} // namespace launcher
+
+#endif

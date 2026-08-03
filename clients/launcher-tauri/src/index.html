@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Silencer Launcher</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="scanlines" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="brand">SILENCER</div>
+
+      <div class="channel" id="channel" role="group" aria-label="Release channel">
+        <button type="button" class="chan-btn" data-channel="stable">STABLE</button>
+        <button type="button" class="chan-btn" data-channel="nightly">NIGHTLY</button>
+      </div>
+
+      <div class="update">
+        <div class="update-status" id="update-status">Checking&hellip;</div>
+        <div class="progress" id="progress" hidden><div class="bar" id="progress-bar"></div></div>
+        <button type="button" class="update-btn" id="update-btn" hidden>UPDATE</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <aside class="sidebar">
+        <h2 class="section">Servers</h2>
+        <ul class="server-list" id="server-list"></ul>
+        <div class="sidebar-foot">
+          <button type="button" class="play-btn" id="play-btn" disabled>PLAY</button>
+          <p class="play-hint" id="play-hint"></p>
+        </div>
+      </aside>
+
+      <section class="news">
+        <h2 class="section">News</h2>
+        <div class="news-list" id="news-list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

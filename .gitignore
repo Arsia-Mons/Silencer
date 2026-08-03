@@ -76,3 +76,9 @@ clients/silencer/build_test/
 clients/silencer/installer/Output/
 clients/silencer/Testing/
 tools/refactor-baselines/
+
+# Launcher prototypes (issue #334)
+clients/launcher-cppx/build-rel/
+clients/launcher-tauri/dist/
+clients/launcher-tauri/src-tauri/target/
+clients/launcher-tauri/src-tauri/gen/
