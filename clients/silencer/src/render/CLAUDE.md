@@ -36,7 +36,7 @@ parity-critical device-rect/UV math (`ui_draw_geometry`).
 
 | File | Purpose |
 |---|---|
-| `pipeline_host.h/cpp` | Drives `client::ui::UiPipeline` for one frame. `render()` → packed RGBA (CPU path); `build_gpu_frame()` → a `GpuUiProgram` (GPU path). |
+| `pipeline_host.h/cpp` | Drives `client::ui::UiPipeline` for one frame. `render()` → packed RGBA (CPU path); `build_gpu_frame()` → a `GpuUiProgram` (GPU path). The CPU raster is damage-tracked (#331): the IR is diffed per-command against the previous frame (arena content, not offsets) and only the changed rects are cleared, re-executed clipped, and re-packed; `UiDamage` reports them for partial uploads. `SILENCER_UI_DAMAGE=0` forces full-surface repaints (the unchanged skip stays). |
 | `ui_surface.h/cpp` | Minimal SDL surface the CPU per-frame loop draws into (clear → execute IR → present); supports full-scene SSAA. |
 | `draw_executor.h/cpp` | Linear CPU executor over the RGBA IR → SDL draw calls (drawn under `SDL_BLENDMODE_BLEND_PREMULTIPLIED`). |
 | `ui_draw_program.h` + `ui_draw_program_builder.h` + `ui_draw_program.cpp` | SIL-240 GPU emitter: lowers the IR to a backend-neutral `GpuUiProgram` (de-indexed clip-space verts + a draw/clip/layer command stream + a premultiplied-RGBA texture manifest). The handoff header is SDL-free. |

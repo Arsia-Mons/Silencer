@@ -26,6 +26,9 @@
 
 #include <memory>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <vector>
 
 #ifndef SILENCER_TEST_FONT_DIR
 #define SILENCER_TEST_FONT_DIR "."
@@ -316,6 +319,71 @@ static bool pipeline_host_renders_semantic_screen() {
   return true;
 }
 
+static void set_env(const char *name, const char *value) {
+#ifdef _WIN32
+  char buf[64];
+  snprintf(buf, sizeof(buf), "%s=%s", name, value ? value : "");
+  _putenv(buf);
+#else
+  if (value)
+    setenv(name, value, 1);
+  else
+    unsetenv(name);
+#endif
+}
+
+// #331: damage-tracked rendering must (a) take the partial path for an
+// in-place interaction restyle — not silently fall back to full — and (b)
+// produce pixels byte-identical to a full-surface repaint of the same state
+// (SILENCER_UI_DAMAGE=0 is the ground truth). The sequence: frame 0 unfocused,
+// frame 1 nav_next focuses the Button (focus ring restyles in place, possibly
+// on a later frame — interaction reads lag one frame by design), then settle.
+static bool pipeline_host_damage_partial_matches_full() {
+  const int W = 200, H = 100;
+  auto run_sequence = [&](std::vector<uint8_t> *out_pixels, bool *saw_partial) {
+    react_init_runtime();
+    silencer::cppx_ui::PipelineHost host;
+    if (!host.ensure(W, H, SILENCER_TEST_FONT_DIR))
+      return false;
+    if (!host.pipeline().client_ui().push_screen(
+            std::make_unique<PrimitiveScreen>()))
+      return false;
+    const uint8_t *rgba = nullptr;
+    int w = 0, h = 0;
+    for (int f = 0; f < 6; ++f) {
+      client::ui::UiPipelineFrame frame = test_frame(W, H);
+      if (f == 1) {
+        frame.input.nav_next = true;
+        frame.input.source = ::ui::UiFocusSource::Keyboard;
+      }
+      bool unchanged = false;
+      silencer::cppx_ui::UiDamage dmg;
+      rgba = host.render(frame, &w, &h, &unchanged, &dmg);
+      if (!rgba)
+        return false;
+      if (saw_partial && !unchanged && !dmg.full && dmg.count > 0)
+        *saw_partial = true;
+    }
+    out_pixels->assign(rgba, rgba + (size_t)w * h * 4u);
+    return true;
+  };
+
+  set_env("SILENCER_UI_DAMAGE", "0");
+  std::vector<uint8_t> full_pixels;
+  const bool full_ok = run_sequence(&full_pixels, nullptr);
+  set_env("SILENCER_UI_DAMAGE", nullptr);
+  CHECK(full_ok);
+
+  std::vector<uint8_t> damage_pixels;
+  bool saw_partial = false;
+  CHECK(run_sequence(&damage_pixels, &saw_partial));
+  CHECK(saw_partial); // the focus restyle actually took the partial path
+  CHECK(full_pixels.size() == damage_pixels.size());
+  CHECK(memcmp(full_pixels.data(), damage_pixels.data(), full_pixels.size()) ==
+        0); // partial repaint == full repaint, byte for byte
+  return true;
+}
+
 int main(void) {
   if (!SDL_Init(0)) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -333,6 +401,8 @@ int main(void) {
   if (!pipeline_host_empty_stack_is_transparent())
     rc = 1;
   if (!pipeline_host_app_root_reconciles_phase())
+    rc = 1;
+  if (!pipeline_host_damage_partial_matches_full())
     rc = 1;
   react_shutdown();
   SDL_Quit();

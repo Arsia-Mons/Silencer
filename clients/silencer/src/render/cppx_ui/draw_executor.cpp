@@ -419,8 +419,17 @@ void execute_draw_commands(SDL_Renderer *renderer,
       (raster.mode == RenderMode::FringeAa) ? (1.0f / scale) : 0.0f;
   SdfMaskCache *const sdf_cache = raster.sdf_cache;
 
+  // The damage rect (when present) seeds the bottom of the clip stack, so
+  // every ClipPop/LayerPop "restore" lands back on it instead of unclipped.
+  // Balanced lists never pop their seed (INV4), but guard anyway.
   SDL_Rect clip_stack[16];
   int clip_depth = 0;
+  const int clip_base = raster.damage ? 1 : 0;
+  if (raster.damage) {
+    clip_stack[0] = *raster.damage;
+    clip_depth = 1;
+    SDL_SetRenderClipRect(renderer, raster.damage);
+  }
 
   constexpr int kLayerStackMax = 8;
   LayerSlot layer_stack[kLayerStackMax];
@@ -428,6 +437,20 @@ void execute_draw_commands(SDL_Renderer *renderer,
 
   for (int ci = 0; ci < list.count; ++ci) {
     const ::ui::DrawCommand &c = list.commands[ci];
+    // Damage cull: a draw command whose conservative bounds miss the damage
+    // rect can't touch it. Brackets (Clip*/Layer*) must still run.
+    if (raster.damage && c.kind != ::ui::DrawCommandKind::ClipPush &&
+        c.kind != ::ui::DrawCommandKind::ClipPop &&
+        c.kind != ::ui::DrawCommandKind::LayerPush &&
+        c.kind != ::ui::DrawCommandKind::LayerPop) {
+      const DevRect b = command_damage_bounds(c, scale);
+      const SDL_Rect br = {static_cast<int>(floorf(b.x)),
+                           static_cast<int>(floorf(b.y)),
+                           static_cast<int>(ceilf(b.w)) + 1,
+                           static_cast<int>(ceilf(b.h)) + 1};
+      if (!SDL_HasRectIntersection(&br, raster.damage))
+        continue;
+    }
     ::ui::MeshSink sink{scratch.v, kVScratch, 0, scratch.i, kIScratch, 0};
     switch (c.kind) {
     case ::ui::DrawCommandKind::Rect:
@@ -504,7 +527,7 @@ void execute_draw_commands(SDL_Renderer *renderer,
       break;
     }
     case ::ui::DrawCommandKind::ClipPop:
-      if (clip_depth > 0)
+      if (clip_depth > clip_base)
         --clip_depth;
       SDL_SetRenderClipRect(renderer,
                             clip_depth > 0 ? &clip_stack[clip_depth - 1] : nullptr);
@@ -537,10 +560,23 @@ void execute_draw_commands(SDL_Renderer *renderer,
       SDL_SetRenderTarget(renderer, target);
       SDL_SetRenderClipRect(renderer, nullptr);
       SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-      SDL_RenderClear(renderer);
-      // Re-apply the active clip (target shares the absolute coordinate space).
-      if (clip_depth > 0)
+      if (clip_depth > 0) {
+        // Children draw and the pop-composite reads only inside the active clip
+        // (ClipPush never widens, pop restores the push-time rect), so clearing
+        // that region is equivalent to a full clear. SDL_RenderClear ignores
+        // clip, and a full-target clear per layer is the exact full-surface
+        // cost the damage seed exists to avoid — overwrite-fill the clip rect.
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        const SDL_Rect &cl = clip_stack[clip_depth - 1];
+        const SDL_FRect cf = {static_cast<float>(cl.x), static_cast<float>(cl.y),
+                              static_cast<float>(cl.w), static_cast<float>(cl.h)};
+        SDL_RenderFillRect(renderer, &cf);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
+        // Re-apply the active clip (target shares the absolute coordinate space).
         SDL_SetRenderClipRect(renderer, &clip_stack[clip_depth - 1]);
+      } else {
+        SDL_RenderClear(renderer);
+      }
       break;
     }
     case ::ui::DrawCommandKind::LayerPop: {

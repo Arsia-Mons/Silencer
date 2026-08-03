@@ -38,6 +38,12 @@ struct RasterConfig {
   // Only used when mode==Sdf. Null is valid — masks are then generated
   // transiently per call (correct, just uncached); the golden harness uses null.
   SdfMaskCache *sdf_cache = nullptr;
+  // Damage clip (device px). When set, it seeds the bottom of the clip stack —
+  // every pixel write stays inside it, including layer composites and clip-pop
+  // restores — and draw commands whose conservative bounds miss it are skipped.
+  // Within the rect the output is byte-identical to an unclipped execute; the
+  // caller owns clearing the rect first (execute never clears).
+  const SDL_Rect *damage = nullptr;
 };
 
 // Execute the IR. `scale` is device px per UI point (HiDPI / SSAA upsample).
