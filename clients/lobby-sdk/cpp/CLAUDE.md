@@ -50,8 +50,9 @@ lobby (`go run ./services/lobby` in another terminal).
   macOS/Linux. For local dev, `services/lobby/CLAUDE.md` calls out
   using `:15170` — the SDK takes a configurable port, so just set
   `cfg.port = 15170`.
-- POSIX-only today (`sys/socket.h`, `select`). Windows port is a
-  small `#ifdef _WIN32` block (`<winsock2.h>`, `closesocket`,
-  `WSAStartup`); add when needed.
+- Sockets are POSIX + Winsock behind a small seam at the top of
+  `client.cpp` (`net_errno`/`net_strerror`/`err_would_block`/…);
+  `connect()` lazily runs `WSAStartup`. Windows consumers must link
+  `ws2_32` (the launcher does).
 - `MAX_FRAME_PAYLOAD == 255`. The codec enforces this on encode;
   exceeding it throws.
