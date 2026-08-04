@@ -187,8 +187,15 @@ private:
   std::atomic<uint64_t> update_bytes_got_{0};
   std::atomic<uint64_t> update_bytes_total_{0};
   std::atomic<bool> cancel_{false};
+  // Set by ~App before joining the worker. curl only unwinds a blocked
+  // transfer from its progress callback, so without this the destructor waits
+  // out the whole in-flight fetch — up to the 15s connect timeout per URL, and
+  // unbounded on a stalled read. Atomic because the curl thread reads it
+  // without mtx_ (which `quit_` needs).
+  std::atomic<bool> shutdown_{false};
 
   friend bool app_download_progress(void *ctx, uint64_t got, uint64_t total);
+  friend bool app_fetch_progress(void *ctx, uint64_t got, uint64_t total);
 };
 
 } // namespace launcher

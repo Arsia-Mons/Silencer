@@ -243,7 +243,14 @@ bool app_download_progress(void *ctx, uint64_t got, uint64_t total) {
   App *app = static_cast<App *>(ctx);
   app->update_bytes_got_.store(got);
   app->update_bytes_total_.store(total);
-  return !app->cancel_.load();
+  return !app->cancel_.load() && !app->shutdown_.load();
+}
+
+// Metadata fetches have no progress UI, but they still need the abort hook:
+// it's the only way curl lets go of a transfer that's mid-flight when the
+// window closes.
+bool app_fetch_progress(void *ctx, uint64_t, uint64_t) {
+  return !static_cast<App *>(ctx)->shutdown_.load();
 }
 
 App::App() {
@@ -254,6 +261,9 @@ App::App() {
 }
 
 App::~App() {
+  // Order matters: the abort flags must be visible to the curl thread before
+  // we block in join(), or the worker keeps waiting on the network.
+  shutdown_.store(true);
   cancel_.store(true);
   {
     std::lock_guard<std::mutex> lk(mtx_);
@@ -297,7 +307,8 @@ std::string App::fetch_text(const std::string &url, const std::string &tmp_name,
   const std::string path = temp_dir() + "/" + tmp_name;
   int http = 0;
   std::string err;
-  UpdaterDownload::Result r = downloader_.Fetch(url, path, nullptr, nullptr, &http, &err);
+  UpdaterDownload::Result r =
+      downloader_.Fetch(url, path, app_fetch_progress, this, &http, &err);
   if (http_status)
     *http_status = http;
   if (r != UpdaterDownload::OK)
