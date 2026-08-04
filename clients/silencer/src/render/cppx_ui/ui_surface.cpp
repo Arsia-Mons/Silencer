@@ -5,7 +5,7 @@ namespace silencer::cppx_ui {
 UiSurface::~UiSurface() { shutdown(); }
 
 bool UiSurface::initialize(SDL_Renderer *renderer, FontRegistry &fonts) {
-  if (!renderer || !fonts.default_font())
+  if (!renderer || !fonts.loaded())
     return false;
   renderer_ = renderer;
   fonts_ = &fonts;

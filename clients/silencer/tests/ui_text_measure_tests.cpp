@@ -60,9 +60,10 @@ int main(void) {
     CHECK(rt.width > 0.0f, "title measure");
     CHECK(rt.width != r.width, "font_id selects a distinct face");
 
-    // Parity with raw SDL_ttf for the body face at the same size.
-    TTF_Font *body = reg.face(silencer::cppx_ui::FontRegistry::Body);
-    TTF_SetFontSize(body, 13.0f);
+    // Parity with raw SDL_ttf for the body face at the same size: the measurer
+    // sums per-glyph advances, so this guards the no-kerning assumption those
+    // sums make against the whole-string layout of the real faces.
+    TTF_Font *body = reg.sized_face(silencer::cppx_ui::FontRegistry::Body, 13);
     int w = 0, h = 0;
     TTF_GetStringSize(body, s, slen, &w, &h);
     CHECK(static_cast<int>(r.width) == w, "measure matches TTF_GetStringSize");

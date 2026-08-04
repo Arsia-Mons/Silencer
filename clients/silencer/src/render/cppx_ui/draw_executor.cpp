@@ -7,13 +7,8 @@
 #include "ui_draw_geometry.h"
 #include "ui/runtime/geometry.h"
 
-#ifndef SILENCER_HEADLESS
-#include <SDL3_ttf/SDL_ttf.h>
-#endif
-
 #include <cmath>
 #include <math.h>
-#include <string.h>
 
 namespace silencer::cppx_ui {
 
@@ -174,44 +169,16 @@ void render_text(SDL_Renderer *r, const ::ui::DrawCommandList &list,
   // Bitmap-glyph path preferred; TTF fallback if the face has no atlas.
   if (render_text_glyphs(r, list, c, glyphs, scale))
     return;
-  if (!fonts || !fonts->default_font())
+  if (!fonts || !fonts->loaded())
     return;
-  char buf[256];
-  size_t n = t.text_len < 255 ? t.text_len : 255;
-  memcpy(buf, &list.text_arena[t.text_off], n);
-  buf[n] = '\0';
-
-  const SDL_Color col = unpremultiply(t.color);
   // Rasterize at device resolution (font_size * scale) so text lands 1:1 crisp.
   const int pixel_size =
       t.font_size > 0 ? static_cast<int>(t.font_size * scale + 0.5f) : 0;
-  const float dx = c.rect.x * scale, dy = c.rect.y * scale;
-
-  int tw = 0, th = 0;
-  if (SDL_Texture *cached = fonts->cached_text_texture(
-          r, t.font_id, buf, n, pixel_size, col, &tw, &th)) {
-    SDL_FRect dst = {dx, dy, static_cast<float>(tw), static_cast<float>(th)};
-    SDL_RenderTexture(r, cached, nullptr, &dst);
+  if (pixel_size <= 0)
     return;
-  }
-
-  // Uncached fallback (empty/over-long/failed): one-off rasterize + free.
-#ifndef SILENCER_HEADLESS
-  TTF_Font *font = fonts->face(t.font_id);
-  if (pixel_size > 0)
-    TTF_SetFontSize(font, static_cast<float>(pixel_size));
-  SDL_Surface *surface = TTF_RenderText_Blended(font, buf, n, col);
-  if (!surface)
-    return;
-  SDL_Texture *texture = SDL_CreateTextureFromSurface(r, surface);
-  if (texture) {
-    SDL_FRect dst = {dx, dy, static_cast<float>(surface->w),
-                     static_cast<float>(surface->h)};
-    SDL_RenderTexture(r, texture, nullptr, &dst);
-    SDL_DestroyTexture(texture);
-  }
-  SDL_DestroySurface(surface);
-#endif // SILENCER_HEADLESS
+  fonts->draw_text(r, t.font_id, pixel_size, &list.text_arena[t.text_off],
+                   t.text_len, unpremultiply(t.color), c.rect.x * scale,
+                   c.rect.y * scale);
 }
 
 // Draw a textured Image command: nine-slice, rounded (tessellated fill + UVs),

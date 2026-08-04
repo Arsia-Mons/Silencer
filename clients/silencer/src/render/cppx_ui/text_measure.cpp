@@ -23,12 +23,14 @@ FontRegistry *g_fonts = nullptr;
 GlyphFonts *g_glyphs = nullptr;
 
 // One query's resolved metrics: bitmap-glyph (monospace) when the face has an
-// atlas, else TTF. For TTF, `adv` is unused (width via TTF_GetStringSize).
+// atlas, else TTF. For TTF, `adv` is unused (width via TTF_GetStringSize on
+// the fixed-size face — the same layout engine FontRegistry::draw_text blits
+// from, so measure == paint).
 struct RunMetrics {
   bool glyph = false;
   const GlyphFonts::Face *gf = nullptr; // glyph mode
   float adv = 0.0f;                     // glyph mode: per-char advance (points)
-  TTF_Font *font = nullptr;             // TTF mode
+  TTF_Font *font = nullptr;             // TTF mode: (face, size) instance
   float line_h = 16.0f;
   float ascent = 0.0f; // cap-top..baseline, points
 };
@@ -50,13 +52,11 @@ RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
       m.ascent = static_cast<float>(gf->ascent) * gscale;
     return m;
   }
-  // TTF: face for q.font_id, sized per-query (matches the paint path).
+  // TTF: the (face, size) font instance — fixed-size, never resized (resizing
+  // flushes SDL_ttf's glyph cache), matching the paint path.
 #ifndef SILENCER_HEADLESS
-  if (g_fonts) {
-    m.font = g_fonts->face(q.font_id);
-    if (m.font && q.font_size > 0)
-      TTF_SetFontSize(m.font, static_cast<float>(q.font_size));
-  }
+  if (g_fonts && q.font_size > 0)
+    m.font = g_fonts->sized_face(q.font_id, q.font_size);
   if (q.line_height > 0.0f) {
     m.line_h = q.line_height;
   } else if (m.font) {

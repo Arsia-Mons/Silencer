@@ -9,8 +9,10 @@
 // Fixed capacities. Bump if needed; "incredibly simple" hello-world doesn't
 // need much. 256: the dense screens (Options·Controls' 30-action keybind table)
 // plus the stacked overlays below them (main menu + options root) exceed 128
-// component instances. Each Fiber is ~420B, so 256 costs ~54KB extra — cheap.
-#define REACT_MAX_FIBERS 256
+// component instances. 1024: the launcher's font-QA specimen (5 faces x 15
+// sizes, each row a Box + two Text components) exceeds 256. Each Fiber is
+// ~420B, so 1024 costs ~430KB — still cheap.
+#define REACT_MAX_FIBERS 1024
 // A single screen view legitimately uses many hooks: the lobby view alone has
 // ~14 (5 use_state + 9 use_text_storage). At 8, take_slot returned null past
 // slot 8 and use_text_storage fell back to ONE shared thread-local sink buffer,

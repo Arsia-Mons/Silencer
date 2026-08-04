@@ -31,7 +31,9 @@ constexpr int UI_RETAINED_MAX_CHILD_ELEMENTS = 1024;
 // OptionsControls failed to commit), so sized to 1 MB.
 constexpr int UI_RETAINED_ELEMENT_ARENA_BYTES = 1048576;
 constexpr int UI_RETAINED_MAX_ELEMENT_DESTRUCTORS = 1024;
-constexpr int UI_RETAINED_STRING_ARENA_BYTES = 16384;
+// The launcher's font-QA specimen (5 faces x 15 sizes, every row a keyed
+// labeled sample) overflowed 16 KB of keys/labels, blanking later text.
+constexpr int UI_RETAINED_STRING_ARENA_BYTES = 65536;
 
 struct UiElement;
 class UiElementFrame;

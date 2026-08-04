@@ -111,10 +111,10 @@ int main(void) {
     CHECK(fonts.load_faces(SILENCER_TEST_FONT_DIR), "load faces");
 
     // Rasterization works at the FontRegistry layer.
-    int tw = 0, th = 0;
-    SDL_Texture *glyph = fonts.cached_text_texture(
-        r, 0, "A", 1, 18, SDL_Color{255, 255, 255, 255}, &tw, &th);
-    CHECK(glyph != nullptr && tw > 0 && th > 0, "cached_text_texture rasterizes");
+    CHECK(fonts.draw_text(r, 0, 18, "A", 1, SDL_Color{255, 255, 255, 255}, 6.f,
+                          4.f),
+          "draw_text renders");
+    CHECK(fonts.rasterizations() > 0, "glyph rasterized");
 
     // Render over a distinct background so the glyph shows regardless of its
     // ink color (the .otf are color faces, rendered in their own ink).
@@ -153,9 +153,47 @@ int main(void) {
     // in the requested token color.
     CHECK(ink > 0, "glyph drew visible pixels (token color)");
 
-    printf("draw executor ok: rect fill + TTF glyph render (tex %dx%d, %d ink "
-           "px, ink~(%d,%d,%d))\n",
-           tw, th, ink, sr, sg, sb);
+    printf("draw executor ok: rect fill + TTF glyph render (%d ink px, "
+           "ink~(%d,%d,%d))\n",
+           ink, sr, sg, sb);
+  }
+
+  // --- Scene 2b: glyph caching under content variety (the launcher QA-panel
+  // workload). Re-executing an unchanged list must rasterize nothing new, no
+  // matter how many distinct strings it holds — the per-string texture cache
+  // thrashed to a 0% hit rate once the working set passed its capacity. ---
+  if (r) {
+    silencer::cppx_ui::FontRegistry fonts;
+    CHECK(fonts.load_faces(SILENCER_TEST_FONT_DIR), "load faces (variety)");
+    g_list.reset();
+    int pushed = 0;
+    for (int i = 0; i < 150; ++i) {
+      char s[32];
+      int n = snprintf(s, sizeof(s), "specimen %03d", i);
+      uint32_t off = 0;
+      if (!g_list.push_text(s, (uint16_t)n, &off))
+        break;
+      ui::DrawCommand cmd{
+          .kind = ui::DrawCommandKind::Text,
+          .rect = {0.f, (float)(i % 24), 32.f, 8.f},
+          .payload = {.text = {.text_off = off,
+                               .text_len = (uint16_t)n,
+                               .color = {255, 255, 255, 255},
+                               .font_id = (uint16_t)(i % 5),
+                               .font_size = (float)(9 + i % 15)}}};
+      if (!g_list.push(cmd))
+        break;
+      ++pushed;
+    }
+    CHECK(pushed == 150, "pushed 150 distinct text commands");
+    silencer::cppx_ui::execute_draw_commands(r, g_list, &fonts, nullptr);
+    const uint64_t warm = fonts.rasterizations();
+    silencer::cppx_ui::execute_draw_commands(r, g_list, &fonts, nullptr);
+    const uint64_t repeat = fonts.rasterizations() - warm;
+    CHECK(repeat == 0, "re-execute of an unchanged list rasterizes nothing");
+    printf("text variety: %d strings, warm %llu rasters, repeat +%llu\n",
+           pushed, (unsigned long long)warm, (unsigned long long)repeat);
+    fonts.shutdown();
   }
 
   // --- Scene 3 (#331): span-fill fast path parity sweep. ---
@@ -187,7 +225,7 @@ int main(void) {
                 ++mismatches;
             }
       CHECK(mismatches == 0, "span fast path is byte-identical to the mesh");
-      printf("span parity ok: %d cases byte-identical\n", cases);
+      printf("span parity: %d cases, %d mismatched\n", cases, mismatches);
     }
     if (pr)
       SDL_DestroyRenderer(pr);

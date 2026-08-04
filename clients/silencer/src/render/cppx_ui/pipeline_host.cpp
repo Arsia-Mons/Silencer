@@ -13,6 +13,7 @@
 
 #include <cstring>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 namespace silencer::cppx_ui {
@@ -38,9 +39,11 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
 
   ui_.shutdown();
   // Chrome + glyph textures are bound to the old renderer; drop them and flag a
-  // re-bake (the composition root re-bakes after ensure() returns).
+  // re-bake (the composition root re-bakes after ensure() returns). TTF glyph
+  // textures re-rasterize lazily against the new renderer.
   textures_.shutdown();
   glyph_fonts_.shutdown();
+  fonts_.drop_textures();
   chrome_dirty_ = true;
   // Bump the generation so the GPU backend flushes its texture cache (ids reuse).
   ++texture_generation_;
@@ -287,6 +290,26 @@ void PipelineHost::diff_damage(const ::ui::DrawCommandList &list, float scale,
     out->full = true;
 }
 
+// SILENCER_UI_PROF=1: per-stage frame-cost split on the CPU path, avg printed
+// to stderr every 120 frames. build = tree+layout+focus+IR emit; diff = IR
+// damage diff; execute = clear+draw+present; pack = surface copies + retain.
+// Off = one cached env test per frame.
+namespace {
+struct UiProfAcc {
+  double build = 0, diff = 0, exec = 0, pack = 0;
+  int frames = 0;
+};
+UiProfAcc g_uiprof;
+bool uiprof_on() {
+  static int en = -1;
+  if (en < 0) {
+    const char *e = SDL_getenv("SILENCER_UI_PROF");
+    en = (e && e[0] == '1') ? 1 : 0;
+  }
+  return en == 1;
+}
+} // namespace
+
 const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
                                     int *out_w, int *out_h, bool *out_unchanged,
                                     UiDamage *out_damage) {
@@ -296,6 +319,10 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
     *out_damage = {};
   if (!surf_ || !r_ || !pipeline_)
     return nullptr;
+
+  const bool prof = uiprof_on();
+  const uint64_t p0 = prof ? SDL_GetTicksNS() : 0;
+  uint64_t cb_in = 0, p_diff = 0, p_exec = 0, p_end = 0;
 
   // Responsive content scale: surface height / logical-layout height (the ratio
   // the composition root set in frame.layout). May be < 1 on small windows —
@@ -307,13 +334,18 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   // state); only the raster is conditional, decided after the IR is built.
   bool unchanged = false;
   pipeline_->render_client_ui_frame(frame, [&] {
+    if (prof)
+      cb_in = SDL_GetTicksNS();
     const ::ui::DrawCommandList &list =
         pipeline_->client_ui().retained_command_list();
 
     UiDamage dmg;
     diff_damage(list, device_scale, &dmg);
+    if (prof)
+      p_diff = SDL_GetTicksNS();
     if (!dmg.full && dmg.count == 0) {
       unchanged = true;
+      p_exec = p_end = p_diff;
       return;
     }
 
@@ -328,6 +360,8 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
                             &glyph_fonts_);
       ui_.resolve_frame();
       ui_.present();
+      if (prof)
+        p_exec = SDL_GetTicksNS();
       // Copy to a tightly-packed buffer (the surface pitch may be padded).
       for (int y = 0; y < h_; ++y)
         memcpy(&packed_[(size_t)y * w_ * 4u], src + (size_t)y * pitch,
@@ -352,6 +386,8 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
       }
       ui_.resolve_frame();
       ui_.present();
+      if (prof)
+        p_exec = SDL_GetTicksNS();
       for (int i = 0; i < dmg.count; ++i) {
         const SDL_Rect &dr = dmg.rects[i];
         for (int y = dr.y; y < dr.y + dr.h; ++y)
@@ -378,7 +414,25 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
           out_damage->rects[i] = dmg.rects[i];
       }
     }
+    if (prof)
+      p_end = SDL_GetTicksNS();
   });
+
+  if (prof && cb_in) {
+    const uint64_t p1 = SDL_GetTicksNS();
+    g_uiprof.build += ((p1 - p0) - (double)(p_end - cb_in)) / 1e6;
+    g_uiprof.diff += (p_diff - cb_in) / 1e6;
+    g_uiprof.exec += (p_exec - p_diff) / 1e6;
+    g_uiprof.pack += (p_end - p_exec) / 1e6;
+    if (++g_uiprof.frames == 120) {
+      fprintf(stderr,
+              "[ui-prof] avg ms over 120 frames: build+layout+ir=%.2f "
+              "diff=%.2f execute=%.2f pack=%.2f\n",
+              g_uiprof.build / 120, g_uiprof.diff / 120, g_uiprof.exec / 120,
+              g_uiprof.pack / 120);
+      g_uiprof = {};
+    }
+  }
 
   if (out_unchanged)
     *out_unchanged = unchanged;
