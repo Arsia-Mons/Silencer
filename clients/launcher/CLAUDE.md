@@ -144,6 +144,15 @@ SILENCER_LAUNCHER_CONFIG=/tmp/cfg.json SILENCER_LAUNCHER_SHOT=/tmp/shot.png \
 `manifest_url_nightly`, `announcements_url` (the shared/news v2 feed —
 production default `https://arsiamons.com/announcements.json`),
 `releases_url` (GitHub Releases API), `lobby_host`, `lobby_port`. Each
+
+All four `*_url` keys can point at one host: `services/admin-api` serves
+`/api/launcher/manifest/{stable,nightly}`, `/api/launcher/news`, and
+`/api/launcher/releases`, which is also the easiest local setup — run the API
+and point the four keys at `http://localhost:24080/api/launcher/...` (loopback
+`http://` is what the download allowlist permits). The shipped defaults still
+go straight to GitHub / `arsiamons.com`; flip them once the endpoints are
+deployed.
+
 channel installs into `{base_dir}/{channel}`; the game binary path is
 derived per-OS, never stored. Reads are type-guarded so one mismatched
 field falls back to its default instead of aborting the parse.
@@ -174,6 +183,13 @@ field falls back to its default instead of aborting the parse.
 - **No `clients/silencer/` edits.** Reused sources are referenced by path from
   `CMakeLists.txt`. The reused UI closure is the game-dep-free set
   (`pipeline_host_tests`' sources minus `app_root.cpp`) plus `navigation_provider`.
+- **A curl transfer is only cancellable from its progress callback.** `~App`
+  sets `quit_` and then blocks in `worker_.join()`, so any fetch without an
+  abort hook holds the process open past the window — up to `CONNECTTIMEOUT`
+  (15s) per URL, unbounded on a stalled read, and the four metadata URLs run in
+  sequence. `shutdown_` (atomic, because the curl thread doesn't hold `mtx_`)
+  is set before the join and read by both progress callbacks. Any new
+  `downloader_.Fetch` call must pass one of them, never `nullptr`.
 - **Updater reuse is partial**: `updaterdownload` + `updatersha256` +
   `updaterzip` only. **Not** `updater.cpp`/`updaterstage2.cpp` — the launcher
   is plain extract-and-replace (the game isn't running). On macOS `updaterzip`

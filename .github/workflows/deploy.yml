@@ -256,6 +256,25 @@ jobs:
             sudo systemctl is-active silencer-lobby
           "
 
+      # The launcher fetches its manifest over HTTP from admin-api, which reads
+      # LAUNCHER_DIR (/launcher, bound to /var/lib/silencer/launcher). The lobby
+      # copy above serves a different consumer — the game client, over the TCP
+      # wire on version-mismatch reject — so both boxes need the same file.
+      - name: Publish stable manifest to admin-api
+        if: steps.ctx.outputs.update_manifest == 'true'
+        env:
+          HOST: ${{ vars.ADMIN_DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-i ~/.ssh/deploy -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts"
+          ssh $SSH_OPTS "ubuntu@$HOST" "sudo mkdir -p /var/lib/silencer/launcher"
+          scp $SSH_OPTS manifest-staging/update.json "ubuntu@$HOST:/tmp/manifest-stable.json"
+          # Move as root: the mount is root-owned, and admin-api only reads it.
+          ssh $SSH_OPTS "ubuntu@$HOST" "
+            sudo mv /tmp/manifest-stable.json /var/lib/silencer/launcher/manifest-stable.json
+            sudo chmod 644 /var/lib/silencer/launcher/manifest-stable.json
+          "
+
       - name: Prune old releases (keep last 3)
         env:
           HOST: ${{ vars.DEPLOY_HOST }}

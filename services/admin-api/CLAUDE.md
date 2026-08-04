@@ -53,6 +53,14 @@ unit + env file + Mongo/LavinMQ co-location are described in
   actors. Reads/writes `shared/assets/behaviortrees/<id>.json`. Node type
   whitelist enforced server-side (`Selector`, `Sequence`, `Leaf`, etc.).
   The game client fetches these at startup for the BT interpreter.
+- `src/routes/launcher.js` — everything `clients/launcher` fetches over HTTP:
+  `GET /launcher/manifest/:channel`, `/launcher/news`, `/launcher/releases`.
+  Public (the launcher has no session yet) and GET-only. One resolution order
+  for all three — a file in `LAUNCHER_DIR` wins, then the in-repo compiled news
+  feed (local dev only; the image copies just `src/`), then a 5-min-cached
+  upstream proxy. That's what makes local and prod the same code path. A
+  manifest has no upstream, so an unpublished channel is a 404 — which is the
+  permanent state of `nightly` until a nightly build pipeline exists.
 - `src/routes/players.js` — `PATCH /:id/ban` and `DELETE /:id`
   proxy to the lobby's internal HTTP (`LOBBY_PLAYER_AUTH_URL`)
   so live clients are kicked. Lobby unreachable is logged but
@@ -117,6 +125,11 @@ unit + env file + Mongo/LavinMQ co-location are described in
   box).
 - **Default seed `admin/admin`** runs only if the `AdminUser`
   collection is empty. Don't ship to prod without changing it.
+- **`bun src/index.js` may not boot locally.** On Bun 1.3.1 the
+  `mongoose` → `bson` import dies with `NotImplementedError: node:v8
+  isBuildingSnapshot`. It fails at import, before any route code runs, so
+  route-level work can be exercised by mounting the router under a bare
+  Express app without the Mongo/AMQP bootstrap.
 - **`fetch` is global** in Bun (and was in Node 22) — no `node-fetch`
   import needed.
 - **`bun install --frozen-lockfile`** is what the Dockerfile uses,

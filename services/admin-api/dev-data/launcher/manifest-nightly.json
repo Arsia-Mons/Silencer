@@ -1,0 +1,7 @@
+{
+  "version": "00063-nightly",
+  "macos_url": "http://localhost:8000/silencer-macos-arm64-nightly.zip",
+  "macos_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "windows_url": "http://localhost:8000/silencer-windows-x64-nightly.zip",
+  "windows_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}

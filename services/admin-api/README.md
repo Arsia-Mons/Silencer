@@ -37,6 +37,10 @@ Environment variables (set in `.env` beside `docker-compose.yml`):
 | `BACKUP_KEEP`         | `10`                                  | Max local backup files to keep     |
 | `GITHUB_TOKEN`        | *(unset)*                             | PAT with `repo` scope for backups  |
 | `GITHUB_BACKUP_REPO`  | `Arsia-Mons/silencer-mongo-backup`   | GitHub repo to push backups to     |
+| `ASSETS_DIR`          | `<repo>/shared/assets`                | Game assets (actordefs, behavior trees, sprites) |
+| `LAUNCHER_DIR`        | `<repo>/services/admin-api/dev-data/launcher` | Files served by `/launcher/*`; `/launcher` in prod |
+| `LAUNCHER_NEWS_URL`   | `https://arsiamons.com/announcements.json` | Upstream for `/launcher/news` when no local file |
+| `LAUNCHER_RELEASES_URL` | `https://api.github.com/repos/Arsia-Mons/Silencer/releases?per_page=20` | Upstream for `/launcher/releases` |
 
 ## API Routes
 
@@ -46,8 +50,10 @@ prepend `/api` to every entry when calling from outside. The `/api` mount
 lets a single Cloudflare Tunnel hostname host both admin-web and admin-api
 without page/route collisions.
 
-All routes except `/api/health` and `/api/auth/login` require a valid JWT
-in `Authorization: Bearer <token>`.
+Most routes require a valid JWT in `Authorization: Bearer <token>`. The
+exceptions are the endpoints game binaries hit without a session: `/api/health`,
+`/api/auth/login`, the read side of `/api/actors` and `/api/behaviortrees`, and
+all of `/api/launcher`. Each is marked in the tables below.
 
 ### Auth — `/auth`
 
@@ -106,6 +112,35 @@ Authenticated via player JWT (issued by lobby player-auth, not admin JWT).
 |--------|---------------|------------------------------------|
 | GET    | `/me`         | Own player profile + lifetime stats |
 | GET    | `/me/matches` | Own match history (paginated)       |
+
+### Launcher — `/launcher`
+
+Public: `clients/launcher` runs before any lobby session exists, so it has no
+token to present. GET only.
+
+| Method | Path                         | Description                                    |
+|--------|------------------------------|------------------------------------------------|
+| GET    | `/launcher/manifest/:channel` | `update.json` for `stable` \| `nightly`. 400 on an unknown channel, 404 when nothing is published on that channel |
+| GET    | `/launcher/news`             | `shared/news` v2 block-AST feed                 |
+| GET    | `/launcher/releases`         | GitHub Releases, proxied and cached 5 min       |
+
+Every endpoint resolves the same way, which is what keeps local dev and
+production on one code path:
+
+1. **A file in `LAUNCHER_DIR`** always wins — `manifest-stable.json`,
+   `manifest-nightly.json`, `announcements.json`, `releases.json`.
+2. **The in-repo compiled feed** (`web/website/announcements.json`) — news
+   only, and only outside the container, so it's a local-dev convenience.
+3. **A cached upstream proxy** — news and releases only. A manifest has no
+   upstream: nothing published means 404.
+
+In production `LAUNCHER_DIR=/launcher` (bound to `/var/lib/silencer/launcher`).
+`deploy.yml` writes `manifest-stable.json` there on any release that refreshes
+the manifest. **There is no nightly build pipeline yet**, so
+`/launcher/manifest/nightly` 404s until one publishes `manifest-nightly.json`.
+
+Locally, `LAUNCHER_DIR` defaults to `services/admin-api/dev-data/launcher/` —
+edit those fixtures freely (see the README in that directory).
 
 ## WebSocket Events (Socket.IO)
 
