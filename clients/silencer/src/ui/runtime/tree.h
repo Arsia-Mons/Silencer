@@ -363,6 +363,20 @@ struct WheelEvent {
   float dy = 0.0f; // +y = wheel up
 };
 
+// Pointer press/drag on a text input. The app shell resolves the pointer x to
+// a byte index into the value BEFORE dispatch (it owns the scroll-window state
+// and the measured-advance math the caret paint uses), so the component never
+// needs layout or measurement.
+enum class TextPointerPhase { Down, Drag };
+
+struct TextPointerEvent {
+  NodeId target = 0;
+  TextPointerPhase phase = TextPointerPhase::Down;
+  int index = 0;  // byte index into value under the pointer
+  int clicks = 1; // OS click streak at press time (2 = double-click)
+  uint16_t modifiers = ::ui::UI_KEY_MOD_NONE;
+};
+
 struct TextInputEvent {
   NodeId target = 0;
   const char *text = "";
@@ -395,6 +409,7 @@ struct NodeMetadata {
   std::function<void(const KeyEvent &)> on_key = {};
   std::function<void(const TextInputEvent &)> on_text_input = {};
   std::function<void(const TextEditingEvent &)> on_text_editing = {};
+  std::function<void(const TextPointerEvent &)> on_text_pointer = {};
   std::function<void(const WheelEvent &)> on_wheel = {};
 };
 
@@ -467,6 +482,7 @@ public:
   bool invoke_text_input(NodeId id, const ::ui::UiTextInputEvent &event) const;
   bool invoke_text_editing(NodeId id,
                            const ::ui::UiTextEditingEvent &event) const;
+  bool invoke_text_pointer(NodeId id, const TextPointerEvent &event) const;
 
   bool snapshot(NodeId id, NodeSnapshot *out) const;
   bool contains(NodeId id) const;
@@ -523,6 +539,7 @@ private:
     std::function<void(const KeyEvent &)> on_key = {};
     std::function<void(const TextInputEvent &)> on_text_input = {};
     std::function<void(const TextEditingEvent &)> on_text_editing = {};
+    std::function<void(const TextPointerEvent &)> on_text_pointer = {};
     std::function<void(const WheelEvent &)> on_wheel = {};
     LayoutStyle style = {};
     Rect layout = {};

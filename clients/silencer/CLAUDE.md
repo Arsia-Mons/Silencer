@@ -133,6 +133,15 @@ Text-input platform gating (`SDL_StartTextInput`/`StopTextInput`) is owned by
 `GameUiPipeline`, gated on `ClientUi::wants_text_input()`. Never call SDL
 text-input functions elsewhere.
 
+Text fields implement the full OS editing model in the shared Input component
+(#336): shift+arrow/Home/End selection, platform word/line chords (macOS
+Option/Cmd, elsewhere Ctrl), Cmd/Ctrl+A/C/X/V via the SDL-free clipboard seam
+(`src/ui/runtime/clipboard.h`, SDL handlers installed by `PipelineHost`), and
+pointer caret/drag/double-click selection (`ClientUi` resolves pointer x → byte
+index with the caret paint math). SDL keycodes/modifiers translate through the
+ONE shared table `src/render/cppx_ui/sdl_ui_input.h` — never a per-app copy;
+mouse press edges must forward `event.button.clicks` + the modifier state.
+
 Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` after UI ownership
 changes; it guards this boundary (and bans the deleted-layer tokens under
 `src/`, including in docs).

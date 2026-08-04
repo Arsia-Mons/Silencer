@@ -26,4 +26,12 @@ bool build_draw_command_list(const UiTree &tree, DrawCommandList *out,
                              NodeId focused_id = 0,
                              InputScrollStore *input_scroll = nullptr);
 
+// Byte index into an input's value under an absolute pointer x (nearest glyph
+// boundary). Inverse of the caret paint math in append_input_contents: same
+// content-box insets, same LAST-PAINTED scroll offset from the store, same
+// measured prefix advances — so a click lands on the boundary the user sees.
+int input_caret_index_from_x(const NodeSnapshot &node,
+                             const InputScrollStore *input_scroll,
+                             float pointer_x);
+
 } // namespace ui

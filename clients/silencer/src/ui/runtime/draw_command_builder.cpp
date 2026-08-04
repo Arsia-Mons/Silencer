@@ -673,4 +673,43 @@ bool build_draw_command_list(const UiTree &tree, DrawCommandList *out,
   return true;
 }
 
+int input_caret_index_from_x(const NodeSnapshot &node,
+                             const InputScrollStore *input_scroll,
+                             float pointer_x) {
+  if (node.role != NodeRole::Input)
+    return 0;
+  const char *value = node.value ? node.value : "";
+  const char *display_value =
+      node.display_value && node.display_value[0] ? node.display_value : value;
+  int length = text_length(value);
+  int display_length = text_length(display_value);
+  float font_size =
+      node.visual.text.font_size > 0.f ? node.visual.text.font_size : 15.f;
+  float line_height = node.visual.text.line_height;
+  uint16_t font_id = node.visual.text.font_id;
+
+  float text_x =
+      node.layout.x + node.layout.border.left + node.layout.padding.left;
+  float scroll_x = 0.f;
+  if (input_scroll) {
+    auto it = input_scroll->find(node.id);
+    if (it != input_scroll->end())
+      scroll_x = it->second;
+  }
+  float local = pointer_x - text_x + scroll_x;
+  if (local <= 0.f)
+    return 0;
+  float prev = 0.f;
+  for (int i = 1; i <= display_length; ++i) {
+    float advance = measured_advance(display_value, static_cast<uint32_t>(i),
+                                     font_id, font_size, line_height);
+    if (advance >= local) {
+      int idx = (local - prev) <= (advance - local) ? i - 1 : i;
+      return clamp_int(idx, 0, length);
+    }
+    prev = advance;
+  }
+  return length;
+}
+
 } // namespace ui

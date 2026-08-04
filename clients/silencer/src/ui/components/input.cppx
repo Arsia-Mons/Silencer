@@ -1,12 +1,25 @@
 #include "input.h"
 
+#include "ui/runtime/clipboard.h"
 #include "ui/runtime/react.h"
 
 #include <algorithm>
+#include <ctype.h>
 #include <string.h>
 
 namespace ui::components {
 namespace {
+
+// Platform editing chords, resolved once here so every client agrees:
+// macOS uses Option for word jumps and Cmd for line start/end; everything
+// else uses Ctrl for word jumps and has no line chord (Home/End serve).
+#ifdef __APPLE__
+constexpr uint16_t kWordModifier = ::ui::UI_KEY_MOD_ALT;
+constexpr uint16_t kLineModifier = ::ui::UI_KEY_MOD_SUPER;
+#else
+constexpr uint16_t kWordModifier = ::ui::UI_KEY_MOD_CTRL;
+constexpr uint16_t kLineModifier = ::ui::UI_KEY_MOD_NONE;
+#endif
 
 struct InputEditState {
   int caret = 0;
@@ -58,6 +71,42 @@ void move_caret(InputEditState &state, int target, int length, bool extend) {
   }
 }
 
+bool is_word_char(char c) {
+  unsigned char u = static_cast<unsigned char>(c);
+  return u >= 0x80 || isalnum(u) || c == '_';
+}
+
+int word_left(const std::string &value, int from) {
+  int i = clamp_int(from, 0, value_length(value));
+  while (i > 0 && !is_word_char(value[static_cast<size_t>(i - 1)]))
+    --i;
+  while (i > 0 && is_word_char(value[static_cast<size_t>(i - 1)]))
+    --i;
+  return i;
+}
+
+int word_right(const std::string &value, int from) {
+  int n = value_length(value);
+  int i = clamp_int(from, 0, n);
+  while (i < n && !is_word_char(value[static_cast<size_t>(i)]))
+    ++i;
+  while (i < n && is_word_char(value[static_cast<size_t>(i)]))
+    ++i;
+  return i;
+}
+
+void erase_range(InputEditState &state, std::string &value, int start,
+                 int end) {
+  int n = value_length(value);
+  start = clamp_int(start, 0, n);
+  end = clamp_int(end, 0, n);
+  if (end <= start)
+    return;
+  value.erase(static_cast<size_t>(start), static_cast<size_t>(end - start));
+  state.caret = start;
+  state.selection_anchor = -1;
+}
+
 void replace_selection_or_insert(InputEditState &state, std::string &value,
                                  const char *text) {
   if (!text || text[0] == '\0')
@@ -71,35 +120,6 @@ void replace_selection_or_insert(InputEditState &state, std::string &value,
   }
   value.insert(static_cast<size_t>(state.caret), text);
   state.caret += static_cast<int>(strlen(text));
-}
-
-void erase_back(InputEditState &state, std::string &value) {
-  if (has_selection(state)) {
-    int start = selection_start(state);
-    int end = selection_end(state);
-    value.erase(static_cast<size_t>(start), static_cast<size_t>(end - start));
-    state.caret = start;
-    state.selection_anchor = -1;
-    return;
-  }
-  if (state.caret <= 0)
-    return;
-  value.erase(static_cast<size_t>(state.caret - 1), 1);
-  state.caret -= 1;
-}
-
-void erase_forward(InputEditState &state, std::string &value) {
-  if (has_selection(state)) {
-    int start = selection_start(state);
-    int end = selection_end(state);
-    value.erase(static_cast<size_t>(start), static_cast<size_t>(end - start));
-    state.caret = start;
-    state.selection_anchor = -1;
-    return;
-  }
-  if (state.caret >= value_length(value))
-    return;
-  value.erase(static_cast<size_t>(state.caret), 1);
 }
 
 bool key_has_modifier(const ::ui::KeyEvent &event,
@@ -151,42 +171,121 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
   ::ui::HostCallbacks callbacks = detail::callbacks_from_props(props);
   callbacks.on_key =
       [state, value = rendered_value, on_change = props.on_change,
+       password = props.password,
        original = callbacks.on_key](const ::ui::KeyEvent &event) mutable {
         if (original)
           original(event);
         if (!state)
           return;
         std::string next = value;
-        clamp_state(*state, value_length(next));
+        int length = value_length(next);
+        clamp_state(*state, length);
         bool extend = key_has_modifier(event, ::ui::UI_KEY_MOD_SHIFT);
+        bool word_mod = key_has_modifier(
+            event, static_cast<::ui::UiKeyModifier>(kWordModifier));
+        bool line_mod =
+            kLineModifier != ::ui::UI_KEY_MOD_NONE &&
+            key_has_modifier(event,
+                             static_cast<::ui::UiKeyModifier>(kLineModifier));
+        // Cmd/Ctrl+letter chords (select-all, clipboard); either modifier
+        // accepted so both platforms' muscle memory works.
+        bool chord = key_has_modifier(event, ::ui::UI_KEY_MOD_CTRL) ||
+                     key_has_modifier(event, ::ui::UI_KEY_MOD_SUPER);
         switch (event.key) {
         case ::ui::UiKey::Backspace:
-          erase_back(*state, next);
+          if (has_selection(*state)) {
+            erase_range(*state, next, selection_start(*state),
+                        selection_end(*state));
+          } else {
+            int start = line_mod ? 0
+                        : word_mod ? word_left(next, state->caret)
+                                   : state->caret - 1;
+            erase_range(*state, next, start, state->caret);
+          }
           publish_change(on_change, next);
           value = next;
           break;
         case ::ui::UiKey::DeleteForward:
-          erase_forward(*state, next);
+          if (has_selection(*state)) {
+            erase_range(*state, next, selection_start(*state),
+                        selection_end(*state));
+          } else {
+            int end = word_mod ? word_right(next, state->caret)
+                               : state->caret + 1;
+            erase_range(*state, next, state->caret, end);
+          }
           publish_change(on_change, next);
           value = next;
           break;
         case ::ui::UiKey::Left:
-          move_caret(*state, state->caret - 1, value_length(next), extend);
+          if (!extend && !word_mod && !line_mod && has_selection(*state)) {
+            // Plain Left with a selection collapses to its left edge.
+            move_caret(*state, selection_start(*state), length, false);
+          } else {
+            int target = line_mod   ? 0
+                         : word_mod ? word_left(next, state->caret)
+                                    : state->caret - 1;
+            move_caret(*state, target, length, extend);
+          }
           break;
         case ::ui::UiKey::Right:
-          move_caret(*state, state->caret + 1, value_length(next), extend);
+          if (!extend && !word_mod && !line_mod && has_selection(*state)) {
+            move_caret(*state, selection_end(*state), length, false);
+          } else {
+            int target = line_mod   ? length
+                         : word_mod ? word_right(next, state->caret)
+                                    : state->caret + 1;
+            move_caret(*state, target, length, extend);
+          }
           break;
         case ::ui::UiKey::Home:
-          move_caret(*state, 0, value_length(next), extend);
+          move_caret(*state, 0, length, extend);
           break;
         case ::ui::UiKey::End:
-          move_caret(*state, value_length(next), value_length(next), extend);
+          move_caret(*state, length, length, extend);
           break;
         case ::ui::UiKey::A:
-          if (key_has_modifier(event, ::ui::UI_KEY_MOD_CTRL) ||
-              key_has_modifier(event, ::ui::UI_KEY_MOD_SUPER)) {
+          if (chord) {
             state->selection_anchor = 0;
-            state->caret = value_length(next);
+            state->caret = length;
+          }
+          break;
+        case ::ui::UiKey::C:
+          if (chord && !password && has_selection(*state)) {
+            int start = selection_start(*state);
+            ::ui::clipboard_write(
+                next.substr(static_cast<size_t>(start),
+                            static_cast<size_t>(selection_end(*state) - start))
+                    .c_str());
+          }
+          break;
+        case ::ui::UiKey::X:
+          if (chord && !password && has_selection(*state)) {
+            int start = selection_start(*state);
+            int end = selection_end(*state);
+            ::ui::clipboard_write(
+                next.substr(static_cast<size_t>(start),
+                            static_cast<size_t>(end - start))
+                    .c_str());
+            erase_range(*state, next, start, end);
+            publish_change(on_change, next);
+            value = next;
+          }
+          break;
+        case ::ui::UiKey::V:
+          if (chord) {
+            std::string clip;
+            if (::ui::clipboard_read(clip)) {
+              // Single-line field: keep the first line of the paste.
+              size_t cut = clip.find_first_of("\r\n");
+              if (cut != std::string::npos)
+                clip.resize(cut);
+              if (!clip.empty()) {
+                replace_selection_or_insert(*state, next, clip.c_str());
+                publish_change(on_change, next);
+                value = next;
+              }
+            }
           }
           break;
         case ::ui::UiKey::Enter:
@@ -199,6 +298,48 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
           break;
         }
       };
+  callbacks.on_text_pointer = [state, value = rendered_value](
+                                  const ::ui::TextPointerEvent &event) {
+    if (!state)
+      return;
+    int length = value_length(value);
+    clamp_state(*state, length);
+    int index = clamp_int(event.index, 0, length);
+    if (event.phase == ::ui::TextPointerPhase::Drag) {
+      move_caret(*state, index, length, true);
+      return;
+    }
+    if (event.clicks >= 3) {
+      state->selection_anchor = 0;
+      state->caret = length;
+    } else if (event.clicks == 2) {
+      // Select the word-char run under the click, or the separator run when
+      // the click is between words.
+      int start = index;
+      int end = index;
+      bool on_word = (index < length &&
+                      is_word_char(value[static_cast<size_t>(index)])) ||
+                     (index > 0 &&
+                      is_word_char(value[static_cast<size_t>(index - 1)]));
+      if (on_word) {
+        while (start > 0 && is_word_char(value[static_cast<size_t>(start - 1)]))
+          --start;
+        while (end < length && is_word_char(value[static_cast<size_t>(end)]))
+          ++end;
+      } else {
+        while (start > 0 &&
+               !is_word_char(value[static_cast<size_t>(start - 1)]))
+          --start;
+        while (end < length && !is_word_char(value[static_cast<size_t>(end)]))
+          ++end;
+      }
+      state->selection_anchor = start;
+      state->caret = end;
+    } else {
+      bool extend = (event.modifiers & ::ui::UI_KEY_MOD_SHIFT) != 0;
+      move_caret(*state, index, length, extend);
+    }
+  };
   callbacks.on_text_input = [state, value = rendered_value,
                              on_change = props.on_change,
                              original = callbacks.on_text_input](

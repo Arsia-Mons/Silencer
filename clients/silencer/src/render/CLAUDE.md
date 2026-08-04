@@ -44,6 +44,7 @@ parity-critical device-rect/UV math (`ui_draw_geometry`).
 | `ui_texture_key.h` | Stable uint64 GPU-texture-cache keys (image slot / glyph face / glyph color-face), tagged so the small per-source ids can't collide. |
 | `sdf_raster.h/cpp` | Signed-distance-field rasterization of rounded primitives (the SDF render mode; CPU path only — not active in production). |
 | `render_mode.h` | The anti-aliasing strategy (fringe-AA vs SDF) consumed by the frame + primitive stages. |
+| `sdl_ui_input.h` | The ONE shared SDL keycode/modifier → `UiKey`/`UiKeyModifier` translator. Every SDL event loop feeding the UI (game `events.cpp`, launcher) must use it — no per-app copies. |
 | `font_registry.h/cpp` | Multi-face SDL_ttf registry; `font_id` → face. The only owner of SDL_ttf. |
 | `text_measure.h/cpp` | SDL_ttf-backed `MeasureTextFn` installed into `ui::set_text_measurer` (measure == paint). |
 | `texture_registry.h/cpp` | `texture_id` → `SDL_Texture*` map (premultiplied); also retains the source RGBA bytes per slot so the GPU emitter can upload them once. |

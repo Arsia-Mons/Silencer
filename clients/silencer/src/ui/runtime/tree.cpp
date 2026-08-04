@@ -262,6 +262,7 @@ bool UiTree::set_metadata(NodeId id, const NodeMetadata &metadata) {
   node->on_wheel = metadata.on_wheel;
   node->on_text_input = metadata.on_text_input;
   node->on_text_editing = metadata.on_text_editing;
+  node->on_text_pointer = metadata.on_text_pointer;
   node->control_offset = metadata.control_offset;
   copy_label(node->control_id, metadata.control_id);
   copy_value(node->accessibility_label, metadata.accessibility_label);
@@ -386,6 +387,18 @@ bool UiTree::invoke_text_editing(NodeId id,
   return true;
 }
 
+bool UiTree::invoke_text_pointer(NodeId id,
+                                 const TextPointerEvent &event) const {
+  const Node *node = find(id);
+  if (!node || !node->interaction.focusable || node->interaction.disabled ||
+      !node->on_text_pointer)
+    return false;
+  TextPointerEvent dispatched = event;
+  dispatched.target = id;
+  node->on_text_pointer(dispatched);
+  return true;
+}
+
 bool UiTree::snapshot(NodeId id, NodeSnapshot *out) const {
   if (!out)
     return false;
@@ -491,6 +504,7 @@ UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
     existing->on_wheel = {};
     existing->on_text_input = {};
     existing->on_text_editing = {};
+    existing->on_text_pointer = {};
     existing->baseline = nullptr;
     existing->baseline_user = nullptr;
     existing->control_offset = 0;

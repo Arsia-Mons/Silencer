@@ -29,6 +29,9 @@ enum class UiKey {
   Enter,
   Tab,
   A,
+  C,
+  V,
+  X,
   Up,
   Down,
   PageUp,
@@ -78,6 +81,11 @@ struct UiInputFrame {
   bool pointer_pressed = false;
   bool pointer_down = false;
   bool pointer_released = false;
+  // Press-edge detail: OS click streak (SDL button.clicks; 2 = double-click)
+  // and the modifier state at press time (shift+click extends a selection).
+  // 0 clicks (synthetic/injected presses) reads as a single click.
+  int pointer_clicks = 0;
+  uint16_t pointer_mods = UI_KEY_MOD_NONE;
 
   // Scroll-wheel delta this frame (+y = wheel up); routed to the hovered
   // scrollable.
