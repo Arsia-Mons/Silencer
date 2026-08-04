@@ -16,6 +16,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <random>
+#include <string>
+#include <vector>
 
 #ifndef LAUNCHER_FONT_DIR
 #define LAUNCHER_FONT_DIR "."
@@ -34,6 +36,57 @@ const char *font_dir() {
 const char *assets_dir() {
   const char *env = getenv("SILENCER_LAUNCHER_ASSETS_DIR");
   return (env && env[0]) ? env : LAUNCHER_ASSETS_DIR;
+}
+
+// The BROWSE... folder pick. SDL may run the dialog callback on another
+// thread, so the chosen path is marshaled back to the main loop as an SDL
+// user event (type s_folder_event, data1 = SDL_strdup'd path).
+Uint32 s_folder_event = 0;
+
+void folder_chosen(void *, const char *const *filelist, int) {
+  if (!filelist || !filelist[0] || !filelist[0][0])
+    return; // canceled, or the dialog errored
+  SDL_Event ev{};
+  ev.type = s_folder_event;
+  ev.user.data1 = SDL_strdup(filelist[0]);
+  SDL_PushEvent(&ev);
+}
+
+// Shot-mode input script (SILENCER_LAUNCHER_SCRIPT): semicolon-separated
+// "tab" / "click:x,y" (logical coords) steps, applied one at a time once the
+// async states settle — offscreen self-verify for focus rings and pointer
+// flows the UI_STATE seeds can't reach. A click presses one frame and
+// releases the next (activation confirms on release over the same node).
+struct ScriptStep {
+  bool click = false;
+  bool back = false; // backtab
+  float x = 0, y = 0;
+};
+
+std::vector<ScriptStep> parse_script(const char *env) {
+  std::vector<ScriptStep> out;
+  if (!env || !env[0])
+    return out;
+  const std::string s = env;
+  size_t pos = 0;
+  while (pos <= s.size()) {
+    const size_t semi = s.find(';', pos);
+    const std::string tok =
+        s.substr(pos, semi == std::string::npos ? std::string::npos : semi - pos);
+    ScriptStep step;
+    if (tok == "tab" || tok == "backtab") {
+      step.back = tok[0] == 'b';
+      out.push_back(step);
+    } else if (tok.rfind("click:", 0) == 0 &&
+               sscanf(tok.c_str() + 6, "%f,%f", &step.x, &step.y) == 2) {
+      step.click = true;
+      out.push_back(step);
+    }
+    if (semi == std::string::npos)
+      break;
+    pos = semi + 1;
+  }
+  return out;
 }
 
 // `typing` = a text field is focused: editing keys go to the field (as UiKey
@@ -151,6 +204,11 @@ int main(int, char **) {
   intents.install = [&app](const std::string &c) { app.install(c); };
   intents.uninstall = [&app](const std::string &c) { app.uninstall(c); };
   intents.set_base_dir = [&app](const std::string &d) { app.set_base_dir(d); };
+  s_folder_event = SDL_RegisterEvents(1);
+  intents.browse_base_dir = [window, &app]() {
+    const std::string start = app.snapshot().base_dir;
+    SDL_ShowOpenFolderDialog(folder_chosen, nullptr, window, start.c_str(), false);
+  };
   intents.play = [&app]() { app.play(); };
   intents.sign_in = [&app](const std::string &u, const std::string &p) { app.sign_in(u, p); };
   intents.sign_out = [&app]() { app.sign_out(); };
@@ -223,6 +281,14 @@ int main(int, char **) {
   int settled_renders = 0;
   float prev_mx = -1.f, prev_my = -1.f;
 
+  // Shot-mode input script state.
+  std::vector<ScriptStep> script =
+      shot_path ? parse_script(getenv("SILENCER_LAUNCHER_SCRIPT")) : std::vector<ScriptStep>();
+  size_t script_i = 0;
+  int script_wait = 0;        // frames to idle between steps
+  bool script_release = false; // a press was injected last frame
+  float script_mx = -1.f, script_my = -1.f; // scripted pointer, sticky
+
   bool running = true;
   bool text_input_on = false;
   while (running) {
@@ -276,6 +342,11 @@ int main(int, char **) {
         input_event = true;
         break;
       default:
+        if (s_folder_event && e.type == s_folder_event && e.user.data1) {
+          app.set_base_dir(static_cast<char *>(e.user.data1));
+          SDL_free(e.user.data1);
+          input_event = true;
+        }
         break;
       }
     }
@@ -297,6 +368,50 @@ int main(int, char **) {
     launcher::AppSnapshot next_snap = app.snapshot();
     const bool snap_changed = !(next_snap == snap);
     snap = std::move(next_snap);
+
+    // Every async source the shot (and its input script) waits out.
+    auto manifest_settled = [](launcher::ManifestStatus m) {
+      return m != launcher::ManifestStatus::Idle && m != launcher::ManifestStatus::Loading;
+    };
+    auto fetch_settled = [](launcher::FetchStatus f) {
+      return f != launcher::FetchStatus::Idle && f != launcher::FetchStatus::Loading;
+    };
+    const bool async_settled =
+        manifest_settled(snap.stable.manifest) && manifest_settled(snap.nightly.manifest) &&
+        fetch_settled(snap.news_status) && fetch_settled(snap.releases_status) &&
+        snap.ping != launcher::PingStatus::Unknown &&
+        snap.ping != launcher::PingStatus::Probing &&
+        snap.auth != launcher::AuthStatus::Connecting &&
+        snap.update_status != launcher::UpdateStatus::Downloading &&
+        snap.update_status != launcher::UpdateStatus::Verifying &&
+        snap.update_status != launcher::UpdateStatus::Extracting;
+
+    // Replay the shot script one step at a time once the app is quiet.
+    if (shot_path && async_settled) {
+      if (script_release) {
+        in.pointer_released = true;
+        in.pointer_down = false;
+        script_release = false;
+        input_event = true;
+      } else if (script_wait > 0) {
+        --script_wait;
+      } else if (script_i < script.size()) {
+        const ScriptStep &step = script[script_i++];
+        if (step.click) {
+          script_mx = step.x;
+          script_my = step.y;
+          in.pointer_pressed = true;
+          in.pointer_down = true;
+          script_release = true;
+        } else {
+          (step.back ? in.nav_previous : in.nav_next) = true;
+          in.source = ::ui::UiFocusSource::Keyboard;
+        }
+        input_event = true;
+        script_wait = 3;
+      }
+    }
+    const bool script_done = script_i >= script.size() && !script_release && script_wait == 0;
 
     // Perf injections count as input (they exist to force repaints).
     const bool perf_inject =
@@ -350,6 +465,8 @@ int main(int, char **) {
     frame.input = in;
     frame.layout = {(float)lw, (float)lh};
     frame.pointer = {mx, my};
+    if (script_mx >= 0.f)
+      frame.pointer = {script_mx, script_my}; // scripted pointer stays put
 
     // In perf mode, force a focus-nav repaint periodically so repaint cost is
     // sampled even when all async states have settled.
@@ -430,21 +547,11 @@ int main(int, char **) {
 
     if (shot_path) {
       ++frame_no;
-      auto manifest_settled = [](launcher::ManifestStatus m) {
-        return m != launcher::ManifestStatus::Idle && m != launcher::ManifestStatus::Loading;
-      };
-      auto fetch_settled = [](launcher::FetchStatus f) {
-        return f != launcher::FetchStatus::Idle && f != launcher::FetchStatus::Loading;
-      };
-      bool settled = manifest_settled(snap.stable.manifest) &&
-                     manifest_settled(snap.nightly.manifest) &&
-                     fetch_settled(snap.news_status) && fetch_settled(snap.releases_status) &&
-                     snap.ping != launcher::PingStatus::Unknown &&
-                     snap.ping != launcher::PingStatus::Probing &&
-                     snap.auth != launcher::AuthStatus::Connecting &&
-                     snap.update_status != launcher::UpdateStatus::Downloading &&
-                     snap.update_status != launcher::UpdateStatus::Verifying &&
-                     snap.update_status != launcher::UpdateStatus::Extracting;
+      // Wait for the script's last activation to render and stabilize
+      // (settled_renders needs two identical input-free frames) before the
+      // write, so the PNG shows the post-interaction state.
+      const bool settled =
+          async_settled && script_done && (script.empty() || settled_renders >= 2);
       if ((settled && frame_no > 20) || frame_no >= 360) {
         if (stbi_write_png(shot_path, ow, oh, 4, rgba, ow * 4))
           fprintf(stderr, "[launcher] wrote screenshot %s (%dx%d, frame %d)\n",

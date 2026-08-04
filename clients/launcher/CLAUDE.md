@@ -34,7 +34,7 @@ Data sources:
 | `src/net.{h,cpp}` | TCP-connect latency ping, detached process spawn, SHA-256 hex. |
 | `src/app.{h,cpp}` | `App`: config + a single background worker (manifest/news/releases fetch, ping, lobby auth, install/uninstall) + the snapshot the UI polls + intents. |
 | `src/ui.{h,cpp}` | Phosphor-green `::ui::Theme`, the `client::ui::UiScreen`, and the view components (composed from the reused `ui::components` primitives; per-session UI state lives in `RootView`'s fiber via `use_state`). |
-| `src/main.cpp` | SDL3 window + event loop (incl. text-input gating for the Input fields); drives `PipelineHost` and blits its RGBA. |
+| `src/main.cpp` | SDL3 window + event loop (incl. text-input gating for the Input fields, the async folder-picker marshal for BROWSE..., and the shot-mode input script); drives `PipelineHost` and blits its RGBA. |
 
 `CMakeLists.txt` compiles the reused `clients/silencer/` sources by absolute
 path (no changes to that tree), the lobby SDK
@@ -96,9 +96,14 @@ Env overrides (all optional):
   async states settle (both manifests, news, releases, ping, auth, any
   in-flight install), write the frame to `<png>`, quit. This is the real
   render pipeline, so the PNG is exactly what the window shows.
-- `SILENCER_LAUNCHER_UI_STATE=<tokens>` — seed the UI state for shots (no
-  click injection offscreen): comma-separated `releases`, `drop`, `auth`,
-  `confirm`, `fontqa` (font QA panel in place of the content panel).
+- `SILENCER_LAUNCHER_UI_STATE=<tokens>` — seed the UI state for shots:
+  comma-separated `releases`, `drop`, `auth`, `confirm`, `fontqa` (font QA
+  panel in place of the content panel).
+- `SILENCER_LAUNCHER_SCRIPT=<steps>` — shot-mode input script: semicolon-
+  separated `tab` / `backtab` / `click:x,y` (logical 900×600 coords) steps, replayed one
+  step per few frames once the async states settle; the shot then waits for
+  the last activation to render. Reaches what UI_STATE can't (focus rings,
+  pointer flows, drop-up row clicks).
 - `SILENCER_LAUNCHER_TEST_SIGNIN=<user:pass>` — shot-mode only: run the real
   TCP opAuth flow on startup (point `lobby_host`/`lobby_port` at a local
   `go run ./services/lobby -addr :15170 ...`).

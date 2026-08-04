@@ -77,6 +77,11 @@ constexpr uint16_t kFaceHeading = 4;
 // − ~22 scrollbar/track.
 constexpr float kDetailTextW = 550.0f;
 constexpr float kListTextW = 168.0f;
+// Channel drop-up: popover width and the wrap widths inside it (popover pad
+// 12 each side; channel rows pad another 12).
+constexpr float kDropW = 460.0f;
+constexpr float kDropInnerTextW = kDropW - 24.0f - 2.0f;  // 434
+constexpr float kDropRowTextW = kDropInnerTextW - 24.0f;  // 410
 
 TextVisual tv(Color c, float size, uint16_t face, TextAlign align = TextAlign::Left,
               ::ui::TextWrap wrap = ::ui::TextWrap::None) {
@@ -147,7 +152,8 @@ StyleStatePatch accent_button(float size = 19) {
                 .corner_radius(3.0f).text(tv(kAccentBright, size, kFaceHeading, TextAlign::Center));
   sp.hover = ::ui::patch().background(Color{34, 128, 46, 255}).border(border1(kAccentBright));
   sp.pressed = ::ui::patch().background(Color{20, 72, 28, 255});
-  sp.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccentBright, 2.0f});
+  // Inset: this face sits flush against the channel segment in the playbar.
+  sp.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccentBright, -4.0f});
   sp.disabled = ::ui::patch().background(Color{14, 26, 16, 255}).border(border1(kBorderDim))
                     .text(tv(kTextFaint, size, kFaceHeading, TextAlign::Center));
   return sp;
@@ -230,13 +236,6 @@ UiElement dot(const char *key, Color c, bool hollow = false) {
                          .corner_radius(3.0f)
                    : ::ui::patch().background(c).corner_radius(3.0f);
   return MkBox(p);
-}
-
-// Long filesystem paths don't fit the drop-up; keep the informative tail.
-std::string tail_ellipsis(const std::string &s, size_t n) {
-  if (s.size() <= n)
-    return s;
-  return "..." + s.substr(s.size() - (n - 3));
 }
 
 UiElement small_button(const char *key, const char *text, Color color,
@@ -360,25 +359,28 @@ void append_blocks(std::vector<UiElement> *out, const std::vector<NewsBlock> &bl
 UiElement list_row(const char *key, const std::string &title, const std::string &marker,
                    const std::string &sub, bool selected,
                    std::function<void(const ::ui::ActivationEvent &)> fn) {
-  std::vector<UiElement> title_kids;
-  title_kids.push_back(label("lr-title", title, selected ? kAccentBright : kText, 11,
-                             kFaceBody, TextAlign::Left, ::ui::TextWrap::Words,
-                             Length::points(kListTextW)));
+  // Sub line carries the date plus the PINNED/LATEST marker right-aligned, so
+  // the title keeps the full row width and nothing clips at the row edge.
+  std::vector<UiElement> sub_kids;
+  sub_kids.push_back(label("lr-sub", sub, kTextFaint, 11, kFaceBody));
+  sub_kids.push_back(spacer("lr-sgap"));
   if (!marker.empty()) {
-    title_kids.push_back(label("lr-mark", marker, kAccent, 11, kFaceBody));
+    sub_kids.push_back(label("lr-mark", marker, kAccent, 11, kFaceBody));
   }
-  BoxProps titlerow{};
-  titlerow.key = "lr-tr";
-  titlerow.layout = row(6);
-  titlerow.layout.align_items = AlignItems::Start;
-  titlerow.children = ::ui::children(title_kids);
+  BoxProps subrow{};
+  subrow.key = "lr-sr";
+  subrow.layout = row(6);
+  subrow.layout.width = Length::percent(100.0f);
+  subrow.children = ::ui::children(sub_kids);
 
   BoxProps inner{};
   inner.key = "lr-inner";
   inner.layout = col(2);
   inner.layout.width = Length::percent(100.0f);
-  inner.children =
-      ::ui::children({MkBox(titlerow), label("lr-sub", sub, kTextFaint, 11, kFaceBody)});
+  inner.children = ::ui::children(
+      {label("lr-title", title, selected ? kAccentBright : kText, 11, kFaceBody,
+             TextAlign::Left, ::ui::TextWrap::Words, Length::points(kListTextW)),
+       MkBox(subrow)});
 
   ButtonProps b{};
   b.key = key;
@@ -473,13 +475,16 @@ UiElement news_content(const AppSnapshot &s, const Intents &in, UiState *st) {
 
   const Announcement &a = s.announcements[sel];
   std::vector<UiElement> detail;
+  // Long titles wrap at the pane width; the date sits under them (a row would
+  // push it off the pane edge).
   BoxProps head{};
   head.key = "news-head";
-  head.layout = row(10);
+  head.layout = col(2);
   head.layout.width = Length::percent(100.0f);
-  head.children = ::ui::children({label("nh-title", a.title, kText, 19, kFaceHeading),
-                                  spacer("nh-gap"),
-                                  label("nh-date", a.date, kTextFaint, 11, kFaceBody)});
+  head.children = ::ui::children(
+      {label("nh-title", a.title, kText, 19, kFaceHeading, TextAlign::Left,
+             ::ui::TextWrap::Words, Length::points(kDetailTextW)),
+       label("nh-date", a.date, kTextFaint, 11, kFaceBody)});
   detail.push_back(MkBox(head));
   detail.push_back(divider("news-div"));
   append_blocks(&detail, a.blocks, in, "nb-" + a.slug + "-");
@@ -510,6 +515,12 @@ UiElement releases_content(const AppSnapshot &s, UiState *st) {
   const std::string installed = s.active().installed;
   const int sel = std::min(st->sel_release, (int)list.size() - 1);
 
+  // Stable tags are numeric ("20260801"); the nightly prerelease carries a
+  // display name ("Latest master (sha)") that takes no "v" prefix.
+  auto display_version = [](const std::string &v) {
+    return (!v.empty() && v[0] >= '0' && v[0] <= '9') ? "v" + v : v;
+  };
+
   std::vector<UiElement> rows;
   for (int i = 0; i < (int)list.size(); ++i) {
     const Release &r = list[i];
@@ -517,24 +528,34 @@ UiElement releases_content(const AppSnapshot &s, UiState *st) {
     std::string sub = r.date;
     if (!installed.empty() && r.version == installed)
       sub += " - INSTALLED";
-    rows.push_back(list_row(dup("rel-" + std::to_string(i)), "v" + r.version, marker, sub,
-                            i == sel,
+    rows.push_back(list_row(dup("rel-" + std::to_string(i)), display_version(r.version),
+                            marker, sub, i == sel,
                             [st, i](const ::ui::ActivationEvent &) { st->sel_release = i; }));
   }
 
   const Release &r = list[sel];
   std::vector<UiElement> detail;
+  // Same shape as the news head: the version wraps (nightly "Latest master
+  // (sha)" names are long), date + install state on the line under it.
+  BoxProps subrow{};
+  subrow.key = "rh-sub";
+  subrow.layout = row(10);
+  subrow.layout.width = Length::percent(100.0f);
+  std::vector<UiElement> sub_kids;
+  sub_kids.push_back(label("rh-date", r.date, kTextFaint, 11, kFaceBody));
+  sub_kids.push_back(spacer("rh-gap"));
+  if (!installed.empty() && r.version == installed)
+    sub_kids.push_back(label("rh-inst", "installed", kTextDim, 11, kFaceBody));
+  subrow.children = ::ui::children(sub_kids);
+
   BoxProps head{};
   head.key = "rel-head";
-  head.layout = row(10);
+  head.layout = col(2);
   head.layout.width = Length::percent(100.0f);
-  std::vector<UiElement> head_kids;
-  head_kids.push_back(label("rh-ver", "v" + r.version, kText, 19, kFaceHeading));
-  head_kids.push_back(label("rh-date", r.date, kTextFaint, 11, kFaceBody));
-  head_kids.push_back(spacer("rh-gap"));
-  if (!installed.empty() && r.version == installed)
-    head_kids.push_back(label("rh-inst", "installed", kTextDim, 11, kFaceBody));
-  head.children = ::ui::children(head_kids);
+  head.children = ::ui::children(
+      {label("rh-ver", display_version(r.version), kText, 19, kFaceHeading,
+             TextAlign::Left, ::ui::TextWrap::Words, Length::points(kDetailTextW)),
+       MkBox(subrow)});
   detail.push_back(MkBox(head));
   detail.push_back(divider("rel-div"));
   if (r.notes.empty()) {
@@ -869,76 +890,77 @@ UiElement channel_row(const AppSnapshot &s, const Intents &in, UiState *st,
   else if (!cs.latest_version.empty() && cs.latest_version != cs.installed)
     dot_color = kAccent;
 
-  // The select region is its own button; the small actions sit beside it so
-  // interactive elements never nest.
-  ButtonProps sel{};
-  sel.key = dup("chsel-" + ch);
-  sel.layout.direction = FlexDirection::Row;
-  sel.layout.align_items = AlignItems::Center;
-  sel.layout.gap = 8;
-  sel.layout.padding = EdgeSizes{6, 6, 0, 0};
-  sel.layout.height = Length::points(24);
-  StyleStatePatch selstyle{};
-  selstyle.base = ::ui::patch().background(Color{0, 0, 0, 0}).border(Border{{0, 0, 0, 0}, {}});
-  selstyle.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccent, 2.0f});
-  sel.style = selstyle;
-  sel.on_activate = [&in, ch](const ::ui::ActivationEvent &) {
-    if (in.set_channel)
-      in.set_channel(ch);
-  };
+  // Head: dot + name, status right-aligned. The full path wraps on its own
+  // line under it; the actions get a row of their own when present.
   std::string chname = ch == "nightly" ? "NIGHTLY" : "STABLE";
-  sel.children = ::ui::children(
-      {dot(dup("chdot-" + ch), dot_color, hollow),
-       label(dup("chname-" + ch), chname, selected ? kAccentBright : kText, 11, kFaceBody)});
-
-  // Head: channel select + the actions. Foot: truncated path + status text
-  // (the two variable-width strings share the line, ellipsized/short).
-  std::vector<UiElement> head_kids = {MkButton(sel), spacer(dup("chgap-" + ch))};
-  if (!busy) {
-    if (cs.manifest == ManifestStatus::UpdateAvailable || cs.installed.empty()) {
-      const bool can = cs.manifest == ManifestStatus::UpdateAvailable;
-      head_kids.push_back(small_button(dup("chinst-" + ch),
-                                       cs.installed.empty() ? "INSTALL" : "UPDATE", kAccent,
-                                       [&in, ch](const ::ui::ActivationEvent &) {
-                                         if (in.install)
-                                           in.install(ch);
-                                       },
-                                       !can));
-    }
-    if (!cs.installed.empty()) {
-      head_kids.push_back(small_button(dup("chdel-" + ch), "UNINSTALL", kTextFaint,
-                                       [st, ch](const ::ui::ActivationEvent &) {
-                                         st->confirm_uninstall = ch;
-                                         st->drop_open = false;
-                                       }));
-    }
-  }
   BoxProps head{};
   head.key = dup("chhead-" + ch);
   head.layout = row(8);
   head.layout.width = Length::percent(100.0f);
-  head.children = ::ui::children(head_kids);
-
-  BoxProps foot{};
-  foot.key = dup("chfoot-" + ch);
-  foot.layout = row(8);
-  foot.layout.width = Length::percent(100.0f);
-  foot.children = ::ui::children(
-      {label(dup("chpath-" + ch), tail_ellipsis(s.base_dir + "/" + ch, 32), kTextFaint, 11,
-             kFaceBody),
-       spacer(dup("chfgap-" + ch)),
+  head.children = ::ui::children(
+      {dot(dup("chdot-" + ch), dot_color, hollow),
+       label(dup("chname-" + ch), chname, selected ? kAccentBright : kText, 11, kFaceBody),
+       spacer(dup("chgap-" + ch)),
        label(dup("chst-" + ch), status, status_color, 11, kFaceBody)});
 
-  BoxProps rowbox{};
-  rowbox.key = dup("chrow-" + ch);
-  rowbox.layout = col(6);
-  rowbox.layout.width = Length::percent(100.0f);
-  rowbox.layout.padding = EdgeSizes{12, 12, 8, 8};
-  rowbox.layout.overflow = ::ui::Overflow::Hidden;
-  rowbox.style = panel_style(selected ? kAccentRow : kPanelSoft,
-                             selected ? kAccent : kBorderDim, 3.0f);
-  rowbox.children = ::ui::children({MkBox(head), MkBox(foot)});
-  return MkBox(rowbox);
+  std::vector<UiElement> row_kids;
+  row_kids.push_back(MkBox(head));
+  row_kids.push_back(label(dup("chpath-" + ch), s.base_dir + "/" + ch, kTextFaint, 11,
+                           kFaceBody, TextAlign::Left, ::ui::TextWrap::Words,
+                           Length::points(kDropRowTextW)));
+
+  std::vector<UiElement> action_kids;
+  if (!busy) {
+    if (cs.manifest == ManifestStatus::UpdateAvailable || cs.installed.empty()) {
+      const bool can = cs.manifest == ManifestStatus::UpdateAvailable;
+      action_kids.push_back(small_button(dup("chinst-" + ch),
+                                         cs.installed.empty() ? "INSTALL" : "UPDATE", kAccent,
+                                         [&in, ch](const ::ui::ActivationEvent &) {
+                                           if (in.install)
+                                             in.install(ch);
+                                         },
+                                         !can));
+    }
+    if (!cs.installed.empty()) {
+      action_kids.push_back(small_button(dup("chdel-" + ch), "UNINSTALL", kTextFaint,
+                                         [st, ch](const ::ui::ActivationEvent &) {
+                                           st->confirm_uninstall = ch;
+                                           st->drop_open = false;
+                                         }));
+    }
+  }
+  if (!action_kids.empty()) {
+    BoxProps actions{};
+    actions.key = dup("chact-" + ch);
+    actions.layout = row(8);
+    actions.layout.width = Length::percent(100.0f);
+    actions.children = ::ui::children(action_kids);
+    row_kids.push_back(MkBox(actions));
+  }
+
+  // The whole row is the channel-select button. The action buttons nest
+  // inside it — the hit test picks the deepest interactive node and
+  // activation never bubbles, so they still win their own clicks.
+  ButtonProps rowbtn{};
+  rowbtn.key = dup("chrow-" + ch);
+  rowbtn.layout = col(6);
+  rowbtn.layout.width = Length::percent(100.0f);
+  rowbtn.layout.align_items = AlignItems::Stretch;
+  rowbtn.layout.padding = EdgeSizes{12, 12, 8, 8};
+  StyleStatePatch rowstyle{};
+  rowstyle.base = ::ui::patch().background(selected ? kAccentRow : kPanelSoft)
+                      .border(border1(selected ? kAccent : kBorderDim))
+                      .corner_radius(3.0f);
+  if (!selected)
+    rowstyle.hover = ::ui::patch().border(border1(kBorder));
+  rowstyle.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccent, 2.0f});
+  rowbtn.style = rowstyle;
+  rowbtn.on_activate = [&in, ch](const ::ui::ActivationEvent &) {
+    if (in.set_channel)
+      in.set_channel(ch);
+  };
+  rowbtn.children = ::ui::children(row_kids);
+  return MkButton(rowbtn);
 }
 
 UiElement channel_dropup(const AppSnapshot &s, const Intents &in, UiState *st) {
@@ -949,10 +971,6 @@ UiElement channel_dropup(const AppSnapshot &s, const Intents &in, UiState *st) {
   kids.push_back(divider("cd-div"));
   kids.push_back(label("cd-loc-label", "INSTALL LOCATION", kTextFaint, 11, kFaceBody));
 
-  BoxProps locrow{};
-  locrow.key = "cd-locrow";
-  locrow.layout = row(8);
-  locrow.layout.width = Length::percent(100.0f);
   if (st->editing_loc) {
     InputProps inp{};
     inp.key = "cd-loc-input";
@@ -961,28 +979,48 @@ UiElement channel_dropup(const AppSnapshot &s, const Intents &in, UiState *st) {
     inp.autofocus = true;
     inp.value = dup(st->loc_text);
     inp.style = input_style();
-    inp.layout.flex_grow = 1.0f;
+    inp.layout.width = Length::percent(100.0f);
     inp.layout.height = Length::points(26);
     inp.layout.padding = EdgeSizes{8, 8, 0, 0};
     inp.on_change = [st](const std::string &v) { st->loc_text = v; };
-    locrow.children = ::ui::children(
-        {MkInput(inp), small_button("cd-loc-save", "SAVE", kAccent,
-                                    [&in, st](const ::ui::ActivationEvent &) {
-                                      if (in.set_base_dir)
-                                        in.set_base_dir(st->loc_text);
-                                      st->editing_loc = false;
-                                    })});
+    kids.push_back(MkInput(inp));
+
+    BoxProps editrow{};
+    editrow.key = "cd-locedit";
+    editrow.layout = row(8);
+    editrow.layout.width = Length::percent(100.0f);
+    editrow.children = ::ui::children(
+        {small_button("cd-loc-save", "SAVE", kAccent,
+                      [&in, st](const ::ui::ActivationEvent &) {
+                        if (in.set_base_dir)
+                          in.set_base_dir(st->loc_text);
+                        st->editing_loc = false;
+                      }),
+         small_button("cd-loc-cancel", "CANCEL", kTextDim,
+                      [st](const ::ui::ActivationEvent &) { st->editing_loc = false; })});
+    kids.push_back(MkBox(editrow));
   } else {
+    // The full path, wrapped — a truncated path tells the user nothing.
+    kids.push_back(label("cd-loc-path", s.base_dir, kTextDim, 11, kFaceBody,
+                         TextAlign::Left, ::ui::TextWrap::Words,
+                         Length::points(kDropInnerTextW)));
+    BoxProps locrow{};
+    locrow.key = "cd-locrow";
+    locrow.layout = row(8);
+    locrow.layout.width = Length::percent(100.0f);
     locrow.children = ::ui::children(
-        {label("cd-loc-path", tail_ellipsis(s.base_dir, 36), kTextDim, 11, kFaceBody),
-         spacer("cd-loc-gap"),
-         small_button("cd-loc-change", "CHANGE...", kTextDim,
+        {small_button("cd-loc-browse", "BROWSE...", kAccent,
+                      [&in, st](const ::ui::ActivationEvent &) {
+                        if (in.browse_base_dir)
+                          in.browse_base_dir();
+                      }),
+         small_button("cd-loc-change", "EDIT PATH", kTextDim,
                       [st, &s](const ::ui::ActivationEvent &) {
                         st->loc_text = s.base_dir;
                         st->editing_loc = true;
                       })});
+    kids.push_back(MkBox(locrow));
   }
-  kids.push_back(MkBox(locrow));
   kids.push_back(label("cd-hint", "Each channel installs into its own subfolder.", kTextFaint,
                        11, kFaceBody));
 
@@ -992,7 +1030,7 @@ UiElement channel_dropup(const AppSnapshot &s, const Intents &in, UiState *st) {
   pop.layout.position = PositionType::Absolute;
   // Root-anchored: above the playbar (18 pad + 52 bar + 8), right-aligned.
   pop.layout.position_inset = EdgeSizes{{}, 18.0f, {}, 78.0f};
-  pop.layout.width = Length::points(400);
+  pop.layout.width = Length::points(kDropW);
   pop.layout.padding = EdgeSizes{12, 12, 10, 10};
   pop.style = panel_style(Color{8, 15, 9, 250}, kBorder, 4.0f);
   pop.children = ::ui::children(kids);
@@ -1023,7 +1061,9 @@ UiElement update_progress_line(const AppSnapshot &s) {
   } else if (s.update_status == UpdateStatus::Extracting) {
     kids.push_back(label("pb-pct", "Installing...", kTextDim, 11, kFaceBody));
   } else if (s.update_status == UpdateStatus::Failed && !s.update_error.empty()) {
-    kids.push_back(label("pb-pct", s.update_error, kOffline, 11, kFaceBody));
+    // Wrapped: an unbounded error line would shove the split button around.
+    kids.push_back(label("pb-pct", s.update_error, kOffline, 11, kFaceBody,
+                         TextAlign::Left, ::ui::TextWrap::Words, Length::points(320)));
   }
   BoxProps wrap{};
   wrap.key = "pb-progress";
@@ -1079,7 +1119,9 @@ UiElement play_bar(const AppSnapshot &s, const Intents &in, UiState *st) {
                       .corner_radius(3.0f)
                       .text(tv(kAccentBright, 11, kFaceBody));
   segstyle.hover = ::ui::patch().background(kAccentFaint);
-  segstyle.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccent, 2.0f});
+  // Inset ring: the split pair sits flush, so an outset ring would run under
+  // the PLAY/INSTALL segment painted after it.
+  segstyle.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccent, -4.0f});
   seg.style = segstyle;
   seg.on_activate = [st](const ::ui::ActivationEvent &) {
     st->drop_open = !st->drop_open;
@@ -1150,8 +1192,8 @@ UiElement confirm_overlay(const AppSnapshot &s, const Intents &in, UiState *st) 
   if (!cs.installed.empty())
     what += " v" + cs.installed;
   kids.push_back(label("cf-what", "Remove " + what + " from disk?", kTextDim, 11, kFaceBody));
-  kids.push_back(
-      label("cf-path", tail_ellipsis(s.base_dir + "/" + ch, 44), kTextFaint, 11, kFaceBody));
+  kids.push_back(label("cf-path", s.base_dir + "/" + ch, kTextFaint, 11, kFaceBody,
+                       TextAlign::Left, ::ui::TextWrap::Words, Length::points(312)));
   kids.push_back(divider("cf-div"));
   BoxProps btns{};
   btns.key = "cf-btns";

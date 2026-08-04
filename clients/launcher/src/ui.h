@@ -25,6 +25,7 @@ struct Intents {
   std::function<void(const std::string &)> install;
   std::function<void(const std::string &)> uninstall;
   std::function<void(const std::string &)> set_base_dir;
+  std::function<void()> browse_base_dir; // OS folder picker; result -> set_base_dir
   std::function<void()> play;
   std::function<void(const std::string &, const std::string &)> sign_in;
   std::function<void()> sign_out;

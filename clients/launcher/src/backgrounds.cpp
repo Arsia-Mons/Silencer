@@ -239,7 +239,7 @@ bool bake_glyph_faces(silencer::cppx_ui::PipelineHost &host,
       {1, 134, 9.f, 15.f, 2},  // Large: caps 0..10 of 13
       {2, 136, 16.f, 23.f, 2}, // Title: caps 0..19 of 24
       {3, 132, 4.f, 7.f, 1},   // Tiny: full 5px cell
-      {4, 135, 8.f, 19.f, 2},  // Heading: caps 0..14 of 17
+      {4, 135, 11.f, 19.f, 2}, // Heading: caps 0..14 of 17
   };
 
   const std::vector<uint8_t> counts = read_file(assets_dir + "/BIN_SPR.DAT");
