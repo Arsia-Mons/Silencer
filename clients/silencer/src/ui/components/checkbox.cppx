@@ -1,5 +1,6 @@
 #include "checkbox.h"
 #include "box.h"
+#include "text.h"
 
 namespace ui::components {
 namespace {
@@ -41,6 +42,16 @@ namespace {
   const ::ui::VisualStyle mark_visual = ::ui::resolve(
       theme.checkbox_mark, {}, detail::interaction_state(props.disabled, props.checked));
 
+  // The label MUST be a styled Text CHILD: the runtime only paints text on
+  // Text-role nodes, so this Host's own text value never renders, and a bare
+  // string child would paint the engine's neutral default — silently dropping
+  // the text visual resolved into box_visual above. Same contract as Button.
+  ::ui::StyleStatePatch label_style{};
+  label_style.base = ::ui::patch().text(box_visual.text);
+  const ::ui::UiElement label_el =
+      props.label ? Text(TextProps{.value = props.label, .style = label_style})
+                  : ::ui::empty();
+
   return <detail.Host
     kind={::ui::HostKind::Checkbox}
     key={props.key}
@@ -59,7 +70,7 @@ namespace {
       style={checkbox_mark_style()}
       visual={mark_visual}
     />
-    {props.label}
+    {label_el}
   </detail.Host>
 }
 
