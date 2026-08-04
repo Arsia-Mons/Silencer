@@ -16,6 +16,10 @@ using ::ui::children;
 
   const char *viewport_id = props.id ? props.id : "ScrollView";
   const char *content_id = use_text_storage("%sContent", viewport_id);
+  // Hooks must run unconditionally: the scrollbar branch below is entered only
+  // when the content overflows, so taking its storage slot there would change
+  // this fiber's hook count between frames.
+  const char *thumb_id = use_text_storage("%sThumb", viewport_id);
   const float viewport_height = use_measured_height(viewport_id);
 
   // When virtualizing, the content track holds only the visible row slice, so
@@ -225,8 +229,6 @@ using ::ui::children;
     thumb.height = ::ui::Length::points(thumb_h);
 
     ::ui::StylePatch thumb_paint = ::ui::patch().background(thumb_fill);
-    const char *thumb_id =
-        props.id ? use_text_storage("%sThumb", props.id) : "ScrollThumb";
     bar = ::ui::component(
         "Box", BoxProps{.key = "bar",
                         .layout = track,
