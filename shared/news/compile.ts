@@ -1,0 +1,135 @@
+// Compiles MDX news items into the portable news feed: a constrained block AST
+// that every renderer (design mock, launcher, future website) draws natively.
+// Markdown is parsed exactly once, at publish time — renderers only walk the
+// JSON. `bun run compile` builds the feed from content/*.mdx; other Bun code
+// (e.g. an admin-api authoring endpoint) can instead import compileItem() /
+// buildFeed() and compile sources from anywhere. Both throw on any Markdown
+// outside the vocabulary, so an item that compiles renders in every client.
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { parse as parseYaml } from "yaml";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export type Span = { text: string; bold?: true; italic?: true; href?: string };
+export type Block =
+  | { type: "heading"; level: number; spans: Span[] }
+  | { type: "paragraph"; spans: Span[] }
+  | { type: "list"; ordered: boolean; items: Span[][] };
+export type Item = {
+  slug: string;
+  title: string;
+  date: string;
+  pinned: boolean;
+  blocks: Block[];
+};
+export type Feed = { version: 2; items: Item[] };
+
+type SpanStyle = { bold?: true; italic?: true; href?: string };
+
+function inlineSpans(nodes: any[], src: string, style: SpanStyle = {}): Span[] {
+  const out: Span[] = [];
+  for (const n of nodes) {
+    if (n.type === "text") {
+      // Soft line breaks inside a paragraph arrive as \n in the text node;
+      // they are formatting in the source, not content.
+      out.push({ text: n.value.replace(/\s*\n\s*/g, " "), ...style });
+    } else if (n.type === "strong") {
+      out.push(...inlineSpans(n.children, src, { ...style, bold: true }));
+    } else if (n.type === "emphasis") {
+      out.push(...inlineSpans(n.children, src, { ...style, italic: true }));
+    } else if (n.type === "link") {
+      out.push(...inlineSpans(n.children, src, { ...style, href: n.url }));
+    } else {
+      throw new Error(
+        `${src}: unsupported inline node "${n.type}" — allowed: text, strong, emphasis, link`,
+      );
+    }
+  }
+  return out;
+}
+
+function toBlocks(root: any, src: string): Block[] {
+  return root.children.map((n: any): Block => {
+    if (n.type === "heading")
+      return { type: "heading", level: n.depth, spans: inlineSpans(n.children, src) };
+    if (n.type === "paragraph") return { type: "paragraph", spans: inlineSpans(n.children, src) };
+    if (n.type === "list") {
+      const items = n.children.map((li: any): Span[] => {
+        if (li.children.length !== 1 || li.children[0].type !== "paragraph")
+          throw new Error(
+            `${src}: list items must be a single paragraph (no nested lists or multi-block items)`,
+          );
+        return inlineSpans(li.children[0].children, src);
+      });
+      return { type: "list", ordered: !!n.ordered, items };
+    }
+    throw new Error(`${src}: unsupported block "${n.type}" — allowed: heading, paragraph, list`);
+  });
+}
+
+// One MDX source (frontmatter + body) -> one feed item. `src` labels errors.
+export function compileItem(raw: string, slug: string, src = slug): Item {
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+  if (!m) throw new Error(`${src}: missing --- frontmatter block`);
+  const fm = parseYaml(m[1]);
+  if (typeof fm?.title !== "string" || !fm.title)
+    throw new Error(`${src}: frontmatter needs a "title" string`);
+  const date = fm.date instanceof Date ? fm.date.toISOString().slice(0, 10) : fm.date;
+  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date))
+    throw new Error(`${src}: frontmatter needs a "date" (YYYY-MM-DD)`);
+  return {
+    slug,
+    title: fm.title,
+    date,
+    pinned: fm.pinned === true,
+    blocks: toBlocks(fromMarkdown(raw.slice(m[0].length)), src),
+  };
+}
+
+export function buildFeed(items: Item[]): Feed {
+  // Pinned first, then newest first (ISO dates, so lexical desc works).
+  const sorted = [...items].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.date.localeCompare(a.date);
+  });
+  return { version: 2, items: sorted };
+}
+
+if (import.meta.main) {
+  try {
+    const contentDir = join(import.meta.dir, "content");
+    const files = readdirSync(contentDir)
+      .filter((f) => /\.mdx?$/.test(f))
+      .sort();
+    if (files.length === 0) throw new Error(`no .mdx files in ${contentDir}`);
+
+    const feed = buildFeed(
+      files.map((f) => compileItem(readFileSync(join(contentDir, f), "utf8"), f.replace(/\.mdx?$/, ""), f)),
+    );
+    const json = JSON.stringify(feed, null, 2) + "\n";
+
+    const distPath = join(import.meta.dir, "dist", "announcements.json");
+    await Bun.write(distPath, json);
+
+    // Mock-consumable copy: docs/design/mocks/*.html are opened from disk,
+    // where fetch() of a sibling JSON file is blocked — a script tag is not.
+    const mockPath = join(import.meta.dir, "..", "..", "docs", "design", "mocks", "news-data.js");
+    await Bun.write(
+      mockPath,
+      `// Generated by \`bun run compile\` in shared/news — do not hand-edit.\n` +
+        `window.SILENCER_NEWS = ${JSON.stringify(feed, null, 2)};\n`,
+    );
+
+    // Published copy: committed into web/website/ so Cloudflare serves the
+    // feed at arsiamons.com/announcements.json with zero deploy-config changes.
+    const sitePath = join(import.meta.dir, "..", "..", "web", "website", "announcements.json");
+    await Bun.write(sitePath, json);
+
+    console.log(
+      `news compile: ${feed.items.length} items -> ${distPath} + ${mockPath} + ${sitePath}`,
+    );
+  } catch (e) {
+    console.error(`news compile: ${e instanceof Error ? e.message : e}`);
+    process.exit(1);
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "items": [
+    {
+      "slug": "2026-08-03-hello-agent",
+      "title": "Hello, Agent",
+      "date": "2026-08-03",
+      "pinned": false,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "spans": [
+            {
+              "text": "This is the first news item, and thank you for reading it."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

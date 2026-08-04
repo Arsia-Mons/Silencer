@@ -82,3 +82,6 @@ clients/launcher-cppx/build-rel/
 clients/launcher-tauri/dist/
 clients/launcher-tauri/src-tauri/target/
 clients/launcher-tauri/src-tauri/gen/
+
+# Generated news feed (shared/news)
+shared/news/dist/

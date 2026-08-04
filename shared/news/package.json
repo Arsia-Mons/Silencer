@@ -1,0 +1,12 @@
+{
+  "name": "@silencer/news",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "bun run compile.ts"
+  },
+  "dependencies": {
+    "mdast-util-from-markdown": "^2.0.2",
+    "yaml": "^2.8.0"
+  }
+}
