@@ -4,6 +4,7 @@
 
 #include "client/ui/app_shell/ui_pipeline.h"
 #include "render/cppx_ui/pipeline_host.h"
+#include "render/cppx_ui/sdl_ui_input.h"
 #include "ui/input.h"
 #include "ui/runtime/react.h"
 
@@ -53,15 +54,47 @@ void folder_chosen(void *, const char *const *filelist, int) {
 }
 
 // Shot-mode input script (SILENCER_LAUNCHER_SCRIPT): semicolon-separated
-// "tab" / "click:x,y" (logical coords) steps, applied one at a time once the
-// async states settle — offscreen self-verify for focus rings and pointer
-// flows the UI_STATE seeds can't reach. A click presses one frame and
-// releases the next (activation confirms on release over the same node).
+// "tab" / "backtab" / "click:x,y" (logical coords) / "dblclick:x,y" /
+// "text:<utf8>" / "key:<name>[+shift|ctrl|alt|super]" steps, applied one at a
+// time once the async states settle — offscreen self-verify for focus rings,
+// pointer flows, and the text-editing model (#336) the UI_STATE seeds can't
+// reach. A click presses one frame and releases the next (activation confirms
+// on release over the same node).
 struct ScriptStep {
   bool click = false;
+  int clicks = 1;    // click streak for click steps (dblclick => 2)
   bool back = false; // backtab
   float x = 0, y = 0;
+  std::string text; // text: step — typed into the focused field
+  ::ui::UiKey key = ::ui::UiKey::Unknown; // key: step
+  uint16_t mods = ::ui::UI_KEY_MOD_NONE;
 };
+
+::ui::UiKey script_key_by_name(const std::string &name) {
+  if (name == "left")
+    return ::ui::UiKey::Left;
+  if (name == "right")
+    return ::ui::UiKey::Right;
+  if (name == "home")
+    return ::ui::UiKey::Home;
+  if (name == "end")
+    return ::ui::UiKey::End;
+  if (name == "backspace")
+    return ::ui::UiKey::Backspace;
+  if (name == "delete")
+    return ::ui::UiKey::DeleteForward;
+  if (name == "enter")
+    return ::ui::UiKey::Enter;
+  if (name == "a")
+    return ::ui::UiKey::A;
+  if (name == "c")
+    return ::ui::UiKey::C;
+  if (name == "v")
+    return ::ui::UiKey::V;
+  if (name == "x")
+    return ::ui::UiKey::X;
+  return ::ui::UiKey::Unknown;
+}
 
 std::vector<ScriptStep> parse_script(const char *env) {
   std::vector<ScriptStep> out;
@@ -81,6 +114,41 @@ std::vector<ScriptStep> parse_script(const char *env) {
                sscanf(tok.c_str() + 6, "%f,%f", &step.x, &step.y) == 2) {
       step.click = true;
       out.push_back(step);
+    } else if (tok.rfind("dblclick:", 0) == 0 &&
+               sscanf(tok.c_str() + 9, "%f,%f", &step.x, &step.y) == 2) {
+      step.click = true;
+      step.clicks = 2;
+      out.push_back(step);
+    } else if (tok.rfind("text:", 0) == 0) {
+      step.text = tok.substr(5);
+      out.push_back(step);
+    } else if (tok.rfind("key:", 0) == 0) {
+      // key:left+shift+alt — a key name, then any modifiers.
+      std::string rest = tok.substr(4);
+      size_t plus = 0;
+      bool first = true;
+      while (plus <= rest.size()) {
+        const size_t next = rest.find('+', plus);
+        const std::string part = rest.substr(
+            plus, next == std::string::npos ? std::string::npos : next - plus);
+        if (first) {
+          step.key = script_key_by_name(part);
+          first = false;
+        } else if (part == "shift") {
+          step.mods |= ::ui::UI_KEY_MOD_SHIFT;
+        } else if (part == "ctrl") {
+          step.mods |= ::ui::UI_KEY_MOD_CTRL;
+        } else if (part == "alt") {
+          step.mods |= ::ui::UI_KEY_MOD_ALT;
+        } else if (part == "super") {
+          step.mods |= ::ui::UI_KEY_MOD_SUPER;
+        }
+        if (next == std::string::npos)
+          break;
+        plus = next + 1;
+      }
+      if (step.key != ::ui::UiKey::Unknown)
+        out.push_back(step);
     }
     if (semi == std::string::npos)
       break;
@@ -90,61 +158,48 @@ std::vector<ScriptStep> parse_script(const char *env) {
 }
 
 // `typing` = a text field is focused: editing keys go to the field (as UiKey
-// events) instead of nav/confirm, and Space types rather than activates.
+// events WITH modifiers, so selection/word-jump/clipboard chords work) instead
+// of nav/confirm, and Space types rather than activates. Keycode + modifier
+// translation is the shared bridge table (#336) — never a local copy.
 void handle_key(SDL_Keycode key, ::ui::UiInputFrame &in, bool typing) {
   in.source = ::ui::UiFocusSource::Keyboard;
+  const uint16_t mods = silencer::cppx_ui::ui_mods_from_sdl(SDL_GetModState());
   switch (key) {
   case SDLK_ESCAPE:
     in.cancel_pressed = true;
-    break;
+    return;
   case SDLK_RETURN:
   case SDLK_KP_ENTER:
     in.confirm_pressed = true;
-    if (typing)
-      ::ui::ui_input_push_key(in, ::ui::UiKey::Enter);
     break;
   case SDLK_SPACE:
     if (!typing)
       in.confirm_pressed = true;
-    break;
+    return;
   case SDLK_TAB:
-    in.nav_next = true;
-    break;
-  case SDLK_BACKSPACE:
-    ::ui::ui_input_push_key(in, ::ui::UiKey::Backspace);
-    break;
-  case SDLK_DELETE:
-    ::ui::ui_input_push_key(in, ::ui::UiKey::DeleteForward);
-    break;
-  case SDLK_HOME:
-    ::ui::ui_input_push_key(in, ::ui::UiKey::Home);
-    break;
-  case SDLK_END:
-    ::ui::ui_input_push_key(in, ::ui::UiKey::End);
-    break;
+    if (mods & ::ui::UI_KEY_MOD_SHIFT)
+      in.nav_previous = true;
+    else
+      in.nav_next = true;
+    return;
   case SDLK_UP:
-    if (!typing)
-      in.nav_up = true;
-    break;
   case SDLK_DOWN:
     if (!typing)
-      in.nav_down = true;
-    break;
+      (key == SDLK_UP ? in.nav_up : in.nav_down) = true;
+    return;
   case SDLK_LEFT:
-    if (typing)
-      ::ui::ui_input_push_key(in, ::ui::UiKey::Left);
-    else
-      in.nav_left = true;
-    break;
   case SDLK_RIGHT:
-    if (typing)
-      ::ui::ui_input_push_key(in, ::ui::UiKey::Right);
-    else
-      in.nav_right = true;
+    if (!typing) {
+      (key == SDLK_LEFT ? in.nav_left : in.nav_right) = true;
+      return;
+    }
     break;
   default:
     break;
   }
+  ::ui::UiKey k = silencer::cppx_ui::ui_key_from_sdl(key);
+  if (k != ::ui::UiKey::Unknown)
+    ::ui::ui_input_push_key(in, k, mods);
 }
 
 } // namespace
@@ -317,6 +372,11 @@ int main(int, char **) {
       case SDL_EVENT_MOUSE_BUTTON_DOWN:
         if (e.button.button == SDL_BUTTON_LEFT) {
           in.pointer_pressed = true;
+          // Click streak + modifiers feed text selection (double-click = word,
+          // shift+click = extend).
+          in.pointer_clicks = (int)e.button.clicks;
+          in.pointer_mods =
+              silencer::cppx_ui::ui_mods_from_sdl(SDL_GetModState());
           lmb_down = true;
           input_event = true;
         }
@@ -402,7 +462,15 @@ int main(int, char **) {
           script_my = step.y;
           in.pointer_pressed = true;
           in.pointer_down = true;
+          in.pointer_clicks = step.clicks;
+          in.pointer_mods = step.mods;
           script_release = true;
+        } else if (!step.text.empty()) {
+          ::ui::ui_input_push_text(in, step.text.c_str());
+          in.source = ::ui::UiFocusSource::Keyboard;
+        } else if (step.key != ::ui::UiKey::Unknown) {
+          ::ui::ui_input_push_key(in, step.key, step.mods);
+          in.source = ::ui::UiFocusSource::Keyboard;
         } else {
           (step.back ? in.nav_previous : in.nav_next) = true;
           in.source = ::ui::UiFocusSource::Keyboard;

@@ -100,10 +100,13 @@ Env overrides (all optional):
   comma-separated `releases`, `drop`, `auth`, `confirm`, `fontqa` (font QA
   panel in place of the content panel).
 - `SILENCER_LAUNCHER_SCRIPT=<steps>` — shot-mode input script: semicolon-
-  separated `tab` / `backtab` / `click:x,y` (logical 900×600 coords) steps, replayed one
+  separated `tab` / `backtab` / `click:x,y` / `dblclick:x,y` (logical 900×600
+  coords) / `text:<utf8>` / `key:<name>[+shift|ctrl|alt|super]` (names: left,
+  right, home, end, backspace, delete, enter, a, c, v, x) steps, replayed one
   step per few frames once the async states settle; the shot then waits for
   the last activation to render. Reaches what UI_STATE can't (focus rings,
-  pointer flows, drop-up row clicks).
+  pointer flows, drop-up row clicks, the #336 text-editing model — e.g.
+  `click:700,114;text:hello world;key:left+shift+alt` shows a word selection).
 - `SILENCER_LAUNCHER_TEST_SIGNIN=<user:pass>` — shot-mode only: run the real
   TCP opAuth flow on startup (point `lobby_host`/`lobby_port` at a local
   `go run ./services/lobby -addr :15170 ...`).

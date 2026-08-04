@@ -63,6 +63,7 @@ set(SIL_UI_RUNTIME
   src/ui/runtime/react.cpp
   src/ui/runtime/element.cpp
   src/ui/runtime/tree.cpp
+  src/ui/runtime/clipboard.cpp
   src/ui/runtime/focus.cpp
   src/ui/runtime/interaction_hooks.cpp
   src/ui/runtime/flex_layout.cpp
