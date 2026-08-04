@@ -32,9 +32,9 @@ FetchContent_Declare(
   SOURCE_SUBDIR yoga)
 FetchContent_MakeAvailable(yoga)
 
-# --- cppx primitive transpile (box/text/button) -------------------------------
+# --- cppx primitive transpile (box/text/button/input/scroll_view) -------------
 # The generic ui::components primitives are authored as .cppx/.hx. Transpile the
-# three the launcher uses with the client's own tool, into a src-mirroring
+# ones the launcher uses with the client's own tool, into a src-mirroring
 # generated tree so `#include "ui/components/box.h"` resolves.
 set(CPPX_TOOL "${SIL}/tools/cppx_transpile.py")
 set(GEN_ROOT "${CMAKE_CURRENT_BINARY_DIR}/generated/cppx")
@@ -42,7 +42,7 @@ set(GEN_DIR "${GEN_ROOT}/src/ui/components")
 file(MAKE_DIRECTORY "${GEN_DIR}")
 
 set(CPPX_GENERATED "")
-foreach(name box text button)
+foreach(name box text button input scroll_view)
   add_custom_command(
     OUTPUT "${GEN_DIR}/${name}.h"
     COMMAND "${Python3_EXECUTABLE}" "${CPPX_TOOL}"
@@ -106,6 +106,13 @@ foreach(s ${SIL_UI_RUNTIME} ${SIL_UI_BRIDGE} ${SIL_APP_SHELL} ${SIL_UPDATER})
   list(APPEND SIL_SOURCES "${SIL}/${s}")
 endforeach()
 
+# Lobby SDK (clients/lobby-sdk/cpp) — TCP opAuth sign-in against the lobby.
+set(LOBBY_SDK "${CMAKE_CURRENT_SOURCE_DIR}/../lobby-sdk/cpp")
+set(LOBBY_SDK_SOURCES
+  "${LOBBY_SDK}/src/client.cpp"
+  "${LOBBY_SDK}/src/codec.cpp"
+  "${LOBBY_SDK}/src/sha1.cpp")
+
 # --- Launcher target ----------------------------------------------------------
 add_executable(silencer-launcher
   src/main.cpp
@@ -115,7 +122,8 @@ add_executable(silencer-launcher
   src/backgrounds.cpp
   src/ui.cpp
   ${CPPX_GENERATED}
-  ${SIL_SOURCES})
+  ${SIL_SOURCES}
+  ${LOBBY_SDK_SOURCES})
 
 target_include_directories(silencer-launcher PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -127,6 +135,7 @@ target_include_directories(silencer-launcher PRIVATE
   "${SIL}/src/ui/runtime"
   "${SIL}/src/client/ui"
   "${SIL}/src/updater"
+  "${LOBBY_SDK}/include"
   "${GEN_ROOT}/src"
   "${GEN_DIR}")
 

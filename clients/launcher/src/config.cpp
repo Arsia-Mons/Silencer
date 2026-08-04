@@ -47,7 +47,7 @@ void mkdir_p(const std::string &path) {
 
 std::string Config::dir_path() {
   // SILENCER_LAUNCHER_CONFIG overrides the file path (for testing); the config
-  // dir is then its parent. Default is the exact shared-contract location.
+  // dir is then its parent.
   const char *env = getenv("SILENCER_LAUNCHER_CONFIG");
   if (env && env[0]) {
     std::string p = env;
@@ -67,16 +67,8 @@ std::string Config::file_path() {
 void Config::apply_defaults() {
   if (channel != "nightly")
     channel = "stable";
-  if (install_dir.empty())
-    install_dir = home_dir() + "/.local/share/silencer-launcher";
-  if (game_binary.empty())
-#ifdef _WIN32
-    game_binary = install_dir + "/Silencer.exe";
-#else
-    game_binary = install_dir + "/Silencer.app/Contents/MacOS/Silencer";
-#endif
-  if (servers.empty())
-    servers.push_back({"Official", "lobby.arsiamons.com", 517});
+  if (base_dir.empty())
+    base_dir = home_dir() + "/.local/share/silencer-launcher";
   if (manifest_url_stable.empty())
     manifest_url_stable =
         "https://github.com/Arsia-Mons/Silencer/releases/latest/download/update.json";
@@ -84,9 +76,13 @@ void Config::apply_defaults() {
     manifest_url_nightly =
         "https://github.com/Arsia-Mons/Silencer/releases/download/latest/update.json";
   if (announcements_url.empty())
-    announcements_url = "https://admin.arsiamons.com/api/announcements";
-  if (last_server < 0 || last_server >= (int)servers.size())
-    last_server = 0;
+    announcements_url = "https://arsiamons.com/announcements.json";
+  if (releases_url.empty())
+    releases_url = "https://api.github.com/repos/Arsia-Mons/Silencer/releases?per_page=20";
+  if (lobby_host.empty())
+    lobby_host = "lobby.arsiamons.com";
+  if (lobby_port <= 0 || lobby_port > 65535)
+    lobby_port = 517;
 }
 
 bool Config::load() {
@@ -95,40 +91,23 @@ bool Config::load() {
     try {
       json j;
       in >> j;
-      // Read each field type-guarded: the config file is a shared contract with
-      // the competing launcher, so a single mismatched field must not abort the
-      // whole parse — fall back to the default for that field only.
+      // Type-guarded field reads: one mismatched field falls back to its
+      // default instead of aborting the whole parse.
       auto str = [&](const char *k, std::string &dst) {
         if (j.contains(k) && j[k].is_string())
           dst = j[k].get<std::string>();
       };
       str("channel", channel);
-      str("installed_version", installed_version);
-      str("install_dir", install_dir);
-      str("game_binary", game_binary);
+      str("base_dir", base_dir);
+      str("installed_stable", installed_stable);
+      str("installed_nightly", installed_nightly);
       str("manifest_url_stable", manifest_url_stable);
       str("manifest_url_nightly", manifest_url_nightly);
       str("announcements_url", announcements_url);
-      if (j.contains("last_server") && j["last_server"].is_number_integer())
-        last_server = j["last_server"].get<int>();
-      if (j.contains("servers") && j["servers"].is_array()) {
-        servers.clear();
-        for (const auto &s : j["servers"]) {
-          if (!s.is_object())
-            continue;
-          ServerCfg sc;
-          if (s.contains("name") && s["name"].is_string())
-            sc.name = s["name"].get<std::string>();
-          else
-            sc.name = "Server";
-          if (s.contains("host") && s["host"].is_string())
-            sc.host = s["host"].get<std::string>();
-          if (s.contains("port") && s["port"].is_number_integer())
-            sc.port = s["port"].get<int>();
-          if (!sc.host.empty())
-            servers.push_back(sc);
-        }
-      }
+      str("releases_url", releases_url);
+      str("lobby_host", lobby_host);
+      if (j.contains("lobby_port") && j["lobby_port"].is_number_integer())
+        lobby_port = j["lobby_port"].get<int>();
     } catch (const std::exception &e) {
       fprintf(stderr, "[launcher] config parse error (%s); using defaults\n", e.what());
     }
@@ -141,16 +120,15 @@ bool Config::load() {
 bool Config::save() const {
   json j;
   j["channel"] = channel;
-  j["installed_version"] = installed_version;
-  j["install_dir"] = install_dir;
-  j["game_binary"] = game_binary;
-  j["last_server"] = last_server;
+  j["base_dir"] = base_dir;
+  j["installed_stable"] = installed_stable;
+  j["installed_nightly"] = installed_nightly;
   j["manifest_url_stable"] = manifest_url_stable;
   j["manifest_url_nightly"] = manifest_url_nightly;
   j["announcements_url"] = announcements_url;
-  j["servers"] = json::array();
-  for (const auto &s : servers)
-    j["servers"].push_back({{"name", s.name}, {"host", s.host}, {"port", s.port}});
+  j["releases_url"] = releases_url;
+  j["lobby_host"] = lobby_host;
+  j["lobby_port"] = lobby_port;
 
   mkdir_p(dir_path());
   const std::string path = file_path();
@@ -175,10 +153,26 @@ bool Config::save() const {
   return true;
 }
 
-const ServerCfg *Config::selected_server() const {
-  if (last_server < 0 || last_server >= (int)servers.size())
-    return nullptr;
-  return &servers[last_server];
+std::string Config::channel_dir(const std::string &ch) const {
+  return base_dir + "/" + ch;
+}
+
+std::string Config::game_binary(const std::string &ch) const {
+#ifdef _WIN32
+  return channel_dir(ch) + "/Silencer.exe";
+#elif defined(__APPLE__)
+  return channel_dir(ch) + "/Silencer.app/Contents/MacOS/Silencer";
+#else
+  return channel_dir(ch) + "/silencer";
+#endif
+}
+
+const std::string &Config::installed(const std::string &ch) const {
+  return ch == "nightly" ? installed_nightly : installed_stable;
+}
+
+void Config::set_installed(const std::string &ch, const std::string &version) {
+  (ch == "nightly" ? installed_nightly : installed_stable) = version;
 }
 
 } // namespace launcher

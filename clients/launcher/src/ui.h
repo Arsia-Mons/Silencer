@@ -17,13 +17,18 @@ class UiScreen;
 
 namespace launcher {
 
-// Named intent closures the UI calls; bound once by main() to the App.
+// Named intent closures the UI calls; bound once by main() to the App
+// (open_url is bound to SDL_OpenURL — the view stays SDL-free).
 struct Intents {
   std::function<void(const std::string &)> set_channel;
   std::function<void()> refresh;
-  std::function<void()> start_update;
-  std::function<void(int)> select_server;
+  std::function<void(const std::string &)> install;
+  std::function<void(const std::string &)> uninstall;
+  std::function<void(const std::string &)> set_base_dir;
   std::function<void()> play;
+  std::function<void(const std::string &, const std::string &)> sign_in;
+  std::function<void()> sign_out;
+  std::function<void(const std::string &)> open_url;
 };
 
 // What the view reads for one frame: a snapshot pointer + the intents. Delivered

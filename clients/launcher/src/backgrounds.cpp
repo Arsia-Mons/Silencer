@@ -1,5 +1,8 @@
 #include "backgrounds.h"
 
+#include "render/cppx_ui/glyph_fonts.h"
+#include "render/cppx_ui/pipeline_host.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -154,10 +157,10 @@ std::vector<Background> load_backgrounds(const std::string &assets_dir) {
   static const Pick kPicks[] = {
       {208, 1, 1, 0}, // bright Mars on starfield (menu backdrop)
       {7, 1, 2, 0},   // green console/schematic screen
-      {0, -1, 5, 0},  // neon industrial dome
+      {0, -1, 5, 720},// neon industrial dome
       {1, -1, 6, 702},// teal night cityscape
       {2, -1, 7, 720},// orange Mars terrain
-      {3, -1, 8, 0},  // sea of clouds + bridge
+      {3, -1, 8, 720},// sea of clouds + bridge
       {4, -1, 9, 704},// dark purple skyline
   };
   constexpr int kGridW = 20, kGridH = 12, kTile = 64;
@@ -210,6 +213,78 @@ std::vector<Background> load_backgrounds(const std::string &assets_dir) {
     out.push_back(std::move(bg));
   }
   return out;
+}
+
+bool bake_glyph_faces(silencer::cppx_ui::PipelineHost &host,
+                      const std::string &assets_dir) {
+  using GF = silencer::cppx_ui::GlyphFonts;
+  // FontRegistry::FaceId -> origin bank, with the game's native metrics
+  // (game_ui_pipeline.cpp kFaceBakes trackings; Body uses origin's BodySm
+  // advance 7 — the tracking the launcher's TTF layout was designed around).
+  //
+  // pad_top: origin cells are cap-top-aligned with the descender zone at the
+  // cell bottom, so flex-centering the line box leaves cap-height text riding
+  // 1.5-2px high. Blank rows baked above each glyph re-center the cap ink in
+  // the line box; descenders hang below it (baseline behavior — the drawn cell
+  // is taller than the box and is not clipped to it).
+  struct FaceBake {
+    int face;
+    int bank;
+    float advance;
+    float line_height;
+    int pad_top;
+  };
+  static const FaceBake kFaces[] = {
+      {0, 133, 7.f, 11.f, 2},  // Body: caps rows 0..7 of 11
+      {1, 134, 9.f, 15.f, 2},  // Large: caps 0..10 of 13
+      {2, 136, 16.f, 23.f, 2}, // Title: caps 0..19 of 24
+      {3, 132, 4.f, 7.f, 1},   // Tiny: full 5px cell
+      {4, 135, 8.f, 19.f, 2},  // Heading: caps 0..14 of 17
+  };
+
+  const std::vector<uint8_t> counts = read_file(assets_dir + "/BIN_SPR.DAT");
+  const std::vector<uint8_t> pal_raw = read_file(assets_dir + "/PALETTE.BIN");
+  if (counts.empty() || pal_raw.empty()) {
+    fprintf(stderr, "[launcher] glyph fonts: no sprite assets at %s\n",
+            assets_dir.c_str());
+    return false;
+  }
+  SDL_Color palette[256];
+  read_palette_page(pal_raw, 0, palette);
+
+  bool ok = true;
+  for (const FaceBake &fb : kFaces) {
+    const std::vector<Sprite> sprites = decode_bank(assets_dir, counts, fb.bank);
+    if (sprites.empty()) {
+      fprintf(stderr, "[launcher] glyph fonts: bank %d failed to decode\n",
+              fb.bank);
+      ok = false;
+      continue;
+    }
+    const int ioffset = fb.bank == 132 ? 34 : 33; // glyph index = char - ioffset
+    GF::GlyphSrc src[GF::kGlyphCount] = {};
+    std::vector<std::vector<uint8_t>> padded;
+    padded.reserve(GF::kGlyphCount);
+    for (int i = 0; i < GF::kGlyphCount; ++i) {
+      const int gi = GF::kFirstChar + i - ioffset;
+      if (gi < 0 || (size_t)gi >= sprites.size())
+        continue; // space and out-of-bank cells stay blank (advance only)
+      const Sprite &sp = sprites[gi];
+      if (sp.w < 1 || sp.h < 1 || sp.px.empty())
+        continue;
+      padded.emplace_back((size_t)sp.w * (sp.h + fb.pad_top), 0);
+      std::vector<uint8_t> &px = padded.back();
+      memcpy(px.data() + (size_t)sp.w * fb.pad_top, sp.px.data(),
+             (size_t)sp.w * sp.h);
+      src[i].indices = px.data();
+      src[i].w = sp.w;
+      src[i].h = sp.h + fb.pad_top;
+    }
+    ok = host.build_glyph_face(fb.face, src, GF::kGlyphCount, palette,
+                               fb.advance, fb.line_height) &&
+         ok;
+  }
+  return ok;
 }
 
 } // namespace launcher

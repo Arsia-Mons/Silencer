@@ -36,24 +36,61 @@ const char *assets_dir() {
   return (env && env[0]) ? env : LAUNCHER_ASSETS_DIR;
 }
 
-void handle_key(SDL_Keycode key, ::ui::UiInputFrame &in, bool &running) {
+// `typing` = a text field is focused: editing keys go to the field (as UiKey
+// events) instead of nav/confirm, and Space types rather than activates.
+void handle_key(SDL_Keycode key, ::ui::UiInputFrame &in, bool typing) {
+  in.source = ::ui::UiFocusSource::Keyboard;
   switch (key) {
-  case SDLK_ESCAPE: running = false; break;
+  case SDLK_ESCAPE:
+    in.cancel_pressed = true;
+    break;
   case SDLK_RETURN:
   case SDLK_KP_ENTER:
-  case SDLK_SPACE:
     in.confirm_pressed = true;
-    in.source = ::ui::UiFocusSource::Keyboard;
+    if (typing)
+      ::ui::ui_input_push_key(in, ::ui::UiKey::Enter);
+    break;
+  case SDLK_SPACE:
+    if (!typing)
+      in.confirm_pressed = true;
     break;
   case SDLK_TAB:
     in.nav_next = true;
-    in.source = ::ui::UiFocusSource::Keyboard;
     break;
-  case SDLK_UP: in.nav_up = true; in.source = ::ui::UiFocusSource::Keyboard; break;
-  case SDLK_DOWN: in.nav_down = true; in.source = ::ui::UiFocusSource::Keyboard; break;
-  case SDLK_LEFT: in.nav_left = true; in.source = ::ui::UiFocusSource::Keyboard; break;
-  case SDLK_RIGHT: in.nav_right = true; in.source = ::ui::UiFocusSource::Keyboard; break;
-  default: break;
+  case SDLK_BACKSPACE:
+    ::ui::ui_input_push_key(in, ::ui::UiKey::Backspace);
+    break;
+  case SDLK_DELETE:
+    ::ui::ui_input_push_key(in, ::ui::UiKey::DeleteForward);
+    break;
+  case SDLK_HOME:
+    ::ui::ui_input_push_key(in, ::ui::UiKey::Home);
+    break;
+  case SDLK_END:
+    ::ui::ui_input_push_key(in, ::ui::UiKey::End);
+    break;
+  case SDLK_UP:
+    if (!typing)
+      in.nav_up = true;
+    break;
+  case SDLK_DOWN:
+    if (!typing)
+      in.nav_down = true;
+    break;
+  case SDLK_LEFT:
+    if (typing)
+      ::ui::ui_input_push_key(in, ::ui::UiKey::Left);
+    else
+      in.nav_left = true;
+    break;
+  case SDLK_RIGHT:
+    if (typing)
+      ::ui::ui_input_push_key(in, ::ui::UiKey::Right);
+    else
+      in.nav_right = true;
+    break;
+  default:
+    break;
   }
 }
 
@@ -93,12 +130,31 @@ int main(int, char **) {
 
   launcher::App app;
 
+  // Shot-mode e2e triggers (no click injection offscreen):
+  // SILENCER_LAUNCHER_TEST_SIGNIN=user:pass runs the real TCP opAuth flow;
+  // SILENCER_LAUNCHER_TEST_INSTALL=<channel> runs the download→verify→extract
+  // flow. The shot waits for both to settle.
+  if (shot_path) {
+    if (const char *si = getenv("SILENCER_LAUNCHER_TEST_SIGNIN")) {
+      std::string cred = si;
+      size_t colon = cred.find(':');
+      if (colon != std::string::npos)
+        app.sign_in(cred.substr(0, colon), cred.substr(colon + 1));
+    }
+    if (const char *ti = getenv("SILENCER_LAUNCHER_TEST_INSTALL"))
+      app.install(ti);
+  }
+
   launcher::Intents intents;
   intents.set_channel = [&app](const std::string &c) { app.set_channel(c); };
   intents.refresh = [&app]() { app.refresh(); };
-  intents.start_update = [&app]() { app.start_update(); };
-  intents.select_server = [&app](int i) { app.select_server(i); };
+  intents.install = [&app](const std::string &c) { app.install(c); };
+  intents.uninstall = [&app](const std::string &c) { app.uninstall(c); };
+  intents.set_base_dir = [&app](const std::string &d) { app.set_base_dir(d); };
   intents.play = [&app]() { app.play(); };
+  intents.sign_in = [&app](const std::string &u, const std::string &p) { app.sign_in(u, p); };
+  intents.sign_out = [&app]() { app.sign_out(); };
+  intents.open_url = [](const std::string &url) { SDL_OpenURL(url.c_str()); };
 
   launcher::AppSnapshot snap;
   launcher::ViewModel vm;
@@ -154,12 +210,36 @@ int main(int, char **) {
   const float perf_scale = ps ? (float)atof(ps) : 0.f;
   const char *pf = getenv("SILENCER_LAUNCHER_PERF_FRAMES");
   const int perf_frame_limit = pf ? atoi(pf) : 0;
+  // PERF_WHEEL=1: hover the content panel and wheel-scroll every frame — the
+  // scroll benchmark (a moving content track repaints the whole viewport).
+  const char *pwh = getenv("SILENCER_LAUNCHER_PERF_WHEEL");
+  const bool perf_wheel = pwh && pwh[0] == '1';
+
+  // Idle-frame skip: the UI can only change through input, app-state deltas,
+  // or its own multi-frame settling (interaction reads lag one frame by
+  // design). Once the pipeline has produced two consecutive byte-identical
+  // frames and none of those sources fire, the loop re-presents the retained
+  // texture without rebuilding anything.
+  int settled_renders = 0;
+  float prev_mx = -1.f, prev_my = -1.f;
 
   bool running = true;
+  bool text_input_on = false;
   while (running) {
     ::ui::UiInputFrame in = {};
     in.source = ::ui::UiFocusSource::Mouse;
     static bool lmb_down = false;
+    bool input_event = false;
+
+    const bool typing = host.pipeline().client_ui().wants_text_input();
+    if (typing != text_input_on) {
+      // SDL3 gates SDL_EVENT_TEXT_INPUT behind an explicit start per window.
+      if (typing)
+        SDL_StartTextInput(window);
+      else
+        SDL_StopTextInput(window);
+      text_input_on = typing;
+    }
 
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
@@ -172,19 +252,28 @@ int main(int, char **) {
         if (e.button.button == SDL_BUTTON_LEFT) {
           in.pointer_pressed = true;
           lmb_down = true;
+          input_event = true;
         }
         break;
       case SDL_EVENT_MOUSE_BUTTON_UP:
         if (e.button.button == SDL_BUTTON_LEFT) {
           in.pointer_released = true;
           lmb_down = false;
+          input_event = true;
         }
         break;
       case SDL_EVENT_MOUSE_WHEEL:
         in.wheel_y += e.wheel.y;
+        input_event = true;
         break;
       case SDL_EVENT_KEY_DOWN:
-        handle_key(e.key.key, in, running);
+        handle_key(e.key.key, in, typing);
+        input_event = true;
+        break;
+      case SDL_EVENT_TEXT_INPUT:
+        ::ui::ui_input_push_text(in, e.text.text);
+        in.source = ::ui::UiFocusSource::Keyboard;
+        input_event = true;
         break;
       default:
         break;
@@ -205,7 +294,35 @@ int main(int, char **) {
       ph = (int)(lh * perf_scale);
     }
 
-    snap = app.snapshot();
+    launcher::AppSnapshot next_snap = app.snapshot();
+    const bool snap_changed = !(next_snap == snap);
+    snap = std::move(next_snap);
+
+    // Perf injections count as input (they exist to force repaints).
+    const bool perf_inject =
+        perf_scale > 0.f && (perf_n % 30 == 7 || perf_wheel);
+    const bool pointer_moved = mx != prev_mx || my != prev_my;
+    prev_mx = mx;
+    prev_my = my;
+    const bool size_changed = tex && (pw != tex_w || ph != tex_h);
+
+    if (!shot_path && tex && settled_renders >= 2 && !input_event &&
+        !pointer_moved && !snap_changed && !size_changed && !perf_inject) {
+      // Nothing can have changed: re-present the retained frame and move on.
+      SDL_SetRenderDrawColor(renderer, 3, 6, 3, 255);
+      SDL_RenderClear(renderer);
+      SDL_RenderTexture(renderer, tex, nullptr, nullptr);
+      SDL_RenderPresent(renderer);
+      if (perf_skip > 0) {
+        --perf_skip;
+      } else {
+        ++perf_nu; // skipped frame: an idle frame that cost ~0
+        ++perf_n;
+        if (perf_frame_limit > 0 && perf_n >= perf_frame_limit)
+          running = false;
+      }
+      continue;
+    }
 
     if (!host.ensure(pw, ph, font_dir())) {
       fprintf(stderr, "PipelineHost::ensure failed (font dir: %s)\n", font_dir());
@@ -213,16 +330,21 @@ int main(int, char **) {
       break;
     }
 
-    if (!bg.indices.empty()) {
-      if (host.chrome_needs_bake()) {
+    // ensure() drops renderer-bound textures (glyph atlases included) on a
+    // reset; re-bake both the origin glyph fonts and the backdrop then.
+    if (host.chrome_needs_bake()) {
+      if (!launcher::bake_glyph_faces(host, assets_dir()))
+        fprintf(stderr, "[launcher] glyph fonts: bake incomplete, TTF fallback stays\n");
+      if (!bg.indices.empty()) {
         bg_id = host.bake_chrome_sprite(bg.indices.data(), bg.w, bg.h, bg.palette);
         if (!bg_id)
           fprintf(stderr, "[launcher] backgrounds: bake failed (%dx%d)\n", bg.w,
                   bg.h);
-        host.mark_chrome_baked();
       }
-      vm.bg_texture = bg_id;
+      host.mark_chrome_baked();
     }
+    if (!bg.indices.empty())
+      vm.bg_texture = bg_id;
 
     client::ui::UiPipelineFrame frame = {};
     frame.input = in;
@@ -235,6 +357,10 @@ int main(int, char **) {
       frame.input.nav_next = true;
       frame.input.source = ::ui::UiFocusSource::Keyboard;
     }
+    if (perf_scale > 0.f && perf_wheel) {
+      frame.input.wheel_y = (perf_n & 1) ? 1.f : -1.f;
+      frame.pointer = {450.f, 350.f}; // over the content panel
+    }
 
     int ow = 0, oh = 0;
     bool unchanged = false;
@@ -244,6 +370,12 @@ int main(int, char **) {
     Uint64 t1 = SDL_GetPerformanceCounter();
     if (!rgba)
       continue;
+    // An input frame never counts toward settling even when byte-identical:
+    // activations dispatch after the tree is built (update_retained_runtime),
+    // so their state change renders one frame later — which the skip gate
+    // would swallow whenever the input frame itself drew nothing (activating
+    // an already-focused control leaves no visual delta).
+    settled_renders = (unchanged && !input_event) ? settled_renders + 1 : 0;
 
     bool fresh_tex = false;
     if (!tex || tex_w != ow || tex_h != oh) {
@@ -298,13 +430,21 @@ int main(int, char **) {
 
     if (shot_path) {
       ++frame_no;
-      bool settled = snap.manifest_status != launcher::ManifestStatus::Idle &&
-                     snap.manifest_status != launcher::ManifestStatus::Loading &&
-                     snap.news_status != launcher::NewsStatus::Idle &&
-                     snap.news_status != launcher::NewsStatus::Loading;
-      for (const auto &sv : snap.servers)
-        if (sv.ping == launcher::PingStatus::Unknown || sv.ping == launcher::PingStatus::Probing)
-          settled = false;
+      auto manifest_settled = [](launcher::ManifestStatus m) {
+        return m != launcher::ManifestStatus::Idle && m != launcher::ManifestStatus::Loading;
+      };
+      auto fetch_settled = [](launcher::FetchStatus f) {
+        return f != launcher::FetchStatus::Idle && f != launcher::FetchStatus::Loading;
+      };
+      bool settled = manifest_settled(snap.stable.manifest) &&
+                     manifest_settled(snap.nightly.manifest) &&
+                     fetch_settled(snap.news_status) && fetch_settled(snap.releases_status) &&
+                     snap.ping != launcher::PingStatus::Unknown &&
+                     snap.ping != launcher::PingStatus::Probing &&
+                     snap.auth != launcher::AuthStatus::Connecting &&
+                     snap.update_status != launcher::UpdateStatus::Downloading &&
+                     snap.update_status != launcher::UpdateStatus::Verifying &&
+                     snap.update_status != launcher::UpdateStatus::Extracting;
       if ((settled && frame_no > 20) || frame_no >= 360) {
         if (stbi_write_png(shot_path, ow, oh, 4, rgba, ow * 4))
           fprintf(stderr, "[launcher] wrote screenshot %s (%dx%d, frame %d)\n",

@@ -4,7 +4,6 @@
   "type": "module",
   "workspaces": [
     "clients/cli",
-    "clients/launcher-tauri",
     "clients/lobby-sdk/ts",
     "clients/tui",
     "services/admin-api",

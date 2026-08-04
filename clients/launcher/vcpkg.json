@@ -1,5 +1,5 @@
 {
-	"name": "silencer-launcher-cppx",
+	"name": "silencer-launcher",
 	"version-string": "0.0.0",
 	"description": "Silencer cppx launcher build dependencies (Windows/vcpkg path)",
 	"dependencies": [
