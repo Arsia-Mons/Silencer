@@ -22,11 +22,6 @@ export const ASSETS_DIR = process.env.ASSETS_DIR || join(__dirname, '..', '..', 
 // (mounted at /launcher); the local default is a dev fixture dir you can edit
 // freely without touching what prod serves.
 export const LAUNCHER_DIR = process.env.LAUNCHER_DIR || join(__dirname, '..', 'dev-data', 'launcher');
-// Local dev reads the real compiled feed (shared/news → web/website) when
-// LAUNCHER_DIR has no announcements.json of its own, so there's no second copy
-// to keep in sync. This path doesn't exist inside the container (the image
-// copies only src/), so production falls through to LAUNCHER_NEWS_URL.
-export const LAUNCHER_NEWS_FALLBACK = join(__dirname, '..', '..', '..', 'web', 'website', 'announcements.json');
 // Upstream for /launcher/news in production. The website Worker stays the
 // publisher of the feed; this endpoint just fronts it so the launcher talks to
 // exactly one host.

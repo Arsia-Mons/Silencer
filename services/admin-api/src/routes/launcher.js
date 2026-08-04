@@ -8,14 +8,12 @@
  * All public: the launcher runs before any lobby session exists, so there is
  * no token to present. GET only — nothing here writes.
  *
- * Resolution order is the same for every endpoint, which is what makes local
- * dev and production the same code path:
+ * Two rules, identical locally and in production — so what you test is what
+ * ships:
  *
- *   1. a file in LAUNCHER_DIR  — always wins. Production's deploy writes the
+ *   1. a file in LAUNCHER_DIR — always wins. Production's deploy writes the
  *      real manifests there; locally you edit dev-data/launcher freely.
- *   2. the in-repo compiled artifact — news only, and only outside the
- *      container (the image copies just src/), so it's a local-dev convenience.
- *   3. an upstream URL, proxied and cached — news and releases only. A manifest
+ *   2. an upstream URL, proxied and cached — news and releases only. A manifest
  *      has no upstream: if nothing is published on that channel, that's a 404.
  */
 
@@ -24,7 +22,6 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import {
   LAUNCHER_DIR,
-  LAUNCHER_NEWS_FALLBACK,
   LAUNCHER_NEWS_URL,
   LAUNCHER_RELEASES_URL,
   GITHUB_TOKEN,
@@ -101,12 +98,6 @@ router.get('/manifest/:channel', (req, res) => {
 router.get('/news', async (_req, res) => {
   const override = localOverride('announcements.json', 'news');
   if (override) return res.json(override);
-  try {
-    const inRepo = readJsonFile(LAUNCHER_NEWS_FALLBACK);
-    if (inRepo) return res.json(inRepo);
-  } catch (err) {
-    console.error('[launcher] in-repo news feed unreadable:', err.message);
-  }
   await proxyJson(LAUNCHER_NEWS_URL, res, 'news');
 });
 

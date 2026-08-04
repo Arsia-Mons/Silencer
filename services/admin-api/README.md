@@ -124,15 +124,12 @@ token to present. GET only.
 | GET    | `/launcher/news`             | `shared/news` v2 block-AST feed                 |
 | GET    | `/launcher/releases`         | GitHub Releases, proxied and cached 5 min       |
 
-Every endpoint resolves the same way, which is what keeps local dev and
-production on one code path:
+Two rules, identical locally and in production, so what you test is what ships:
 
 1. **A file in `LAUNCHER_DIR`** always wins — `manifest-stable.json`,
    `manifest-nightly.json`, `announcements.json`, `releases.json`.
-2. **The in-repo compiled feed** (`web/website/announcements.json`) — news
-   only, and only outside the container, so it's a local-dev convenience.
-3. **A cached upstream proxy** — news and releases only. A manifest has no
-   upstream: nothing published means 404.
+2. **Otherwise a cached upstream proxy** — news and releases only. A manifest
+   has no upstream: nothing published means 404.
 
 In production `LAUNCHER_DIR=/launcher` (bound to `/var/lib/silencer/launcher`).
 `deploy.yml` writes `manifest-stable.json` there on any release that refreshes
@@ -140,7 +137,13 @@ the manifest. **There is no nightly build pipeline yet**, so
 `/launcher/manifest/nightly` 404s until one publishes `manifest-nightly.json`.
 
 Locally, `LAUNCHER_DIR` defaults to `services/admin-api/dev-data/launcher/` —
-edit those fixtures freely (see the README in that directory).
+edit those fixtures freely (see the README in that directory). Refresh the news
+fixture after editing `shared/news/content/`:
+
+```sh
+cd shared/news && bun run compile && cd -
+cp web/website/announcements.json services/admin-api/dev-data/launcher/announcements.json
+```
 
 ## WebSocket Events (Socket.IO)
 

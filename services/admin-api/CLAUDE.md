@@ -55,10 +55,11 @@ unit + env file + Mongo/LavinMQ co-location are described in
   The game client fetches these at startup for the BT interpreter.
 - `src/routes/launcher.js` — everything `clients/launcher` fetches over HTTP:
   `GET /launcher/manifest/:channel`, `/launcher/news`, `/launcher/releases`.
-  Public (the launcher has no session yet) and GET-only. One resolution order
-  for all three — a file in `LAUNCHER_DIR` wins, then the in-repo compiled news
-  feed (local dev only; the image copies just `src/`), then a 5-min-cached
-  upstream proxy. That's what makes local and prod the same code path. A
+  Public (the launcher has no session yet) and GET-only. Two rules for all
+  three — a file in `LAUNCHER_DIR` wins, else a 5-min-cached upstream proxy.
+  Deliberately no third tier reading `web/website/announcements.json`: that
+  path only exists outside the container, so it made local and prod take
+  different branches. Keep the resolution identical in both. A
   manifest has no upstream, so an unpublished channel is a 404 — which is the
   permanent state of `nightly` until a nightly build pipeline exists.
 - `src/routes/players.js` — `PATCH /:id/ban` and `DELETE /:id`
