@@ -44,6 +44,8 @@ namespace {
       .pointer_valid = true,
       .pointer_x = frame.pointer.x,
       .pointer_y = frame.pointer.y,
+      .pointer_clicks = frame.input.pointer_clicks,
+      .pointer_mods = frame.input.pointer_mods,
       .wheel_x = frame.input.wheel_x,
       .wheel_y = frame.input.wheel_y,
       .source = to_retained_focus_source(frame.input.source),

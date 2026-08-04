@@ -213,6 +213,54 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
       audible_button(focused))
     audio_events_.nav_focused_button = true;
 
+  // Text-pointer dispatch: a press on an input places the caret at the click
+  // (double-click = word, triple = all, shift+click = extend); holding and
+  // moving drags the selection out. The x -> byte index mapping reuses the
+  // caret paint math plus the LAST-PAINTED scroll offsets, so the hit lands
+  // under the glyphs the user sees. The press-origin input keeps receiving
+  // Drag events while the button is held (pointer capture).
+  if (input.pointer_pressed) {
+    text_drag_node_ = 0;
+    ::ui::NodeId hovered = ::ui::focus_hovered_id(retained_focus_);
+    ::ui::NodeSnapshot pressed_snap = {};
+    if (hovered != 0 && retained_tree_.snapshot(hovered, &pressed_snap) &&
+        pressed_snap.role == ::ui::NodeRole::Input &&
+        !pressed_snap.interaction.disabled) {
+      int clicks = input.pointer_clicks > 0 ? input.pointer_clicks : 1;
+      retained_tree_.invoke_text_pointer(
+          hovered,
+          {.target = hovered,
+           .phase = ::ui::TextPointerPhase::Down,
+           .index = ::ui::input_caret_index_from_x(pressed_snap, &input_scroll_,
+                                                   input.pointer_x),
+           .clicks = clicks,
+           .modifiers = input.pointer_mods});
+      // Only a single click arms the drag; a word/all selection would be
+      // collapsed by the very first Drag sample otherwise.
+      if (clicks == 1) {
+        text_drag_node_ = hovered;
+        text_drag_last_x_ = input.pointer_x;
+      }
+    }
+  } else if (input.pointer_down && text_drag_node_ != 0) {
+    if (input.pointer_valid && input.pointer_x != text_drag_last_x_) {
+      ::ui::NodeSnapshot drag_snap = {};
+      if (retained_tree_.snapshot(text_drag_node_, &drag_snap)) {
+        retained_tree_.invoke_text_pointer(
+            text_drag_node_,
+            {.target = text_drag_node_,
+             .phase = ::ui::TextPointerPhase::Drag,
+             .index = ::ui::input_caret_index_from_x(
+                 drag_snap, &input_scroll_, input.pointer_x),
+             .clicks = 1,
+             .modifiers = input.pointer_mods});
+      }
+      text_drag_last_x_ = input.pointer_x;
+    }
+  } else if (!input.pointer_down) {
+    text_drag_node_ = 0;
+  }
+
   ::ui::NodeId active = ::ui::focus_focused_id(retained_focus_);
   for (int i = 0; i < input.key_event_count; ++i) {
     retained_tree_.invoke_key(active, input.key_events[i]);

@@ -21,7 +21,8 @@ It must stay screen-agnostic and game-agnostic — it knows nothing about
 | `style/theme.h`, `default_theme.cpp` | `Theme`/`RoleStyle` + the neutral fallback theme (`use_theme()` via `ThemeContext`). |
 | `style/resolve.{h,cpp}` | `resolve()` — layers role + override patches + interaction state into one `VisualStyle` at authoring time. |
 | `style/text_measure.{h,cpp}`, `text_wrap.{h,cpp}` | SDL-free text measure/wrap seam (`set_text_measurer`); the renderer installs the real measurer. |
-| `input.h` | `UiInputFrame` — the per-frame nav/confirm/cancel/pointer + key/text/editing event channels. |
+| `runtime/clipboard.{h,cpp}` | SDL-free OS-clipboard seam (`set_clipboard_handlers`); the renderer bridge installs the SDL handlers. Input's Cmd/Ctrl+C/X/V read/write through it. |
+| `input.h` | `UiInputFrame` — the per-frame nav/confirm/cancel/pointer + key/text/editing event channels (pointer press carries OS click count + modifiers for text selection). |
 
 The legacy `design/Colors.h` + `Spacing.h` constants are gone (SIL-17). The
 single source of app paint is now the design tokens (`silencer::tokens` in
