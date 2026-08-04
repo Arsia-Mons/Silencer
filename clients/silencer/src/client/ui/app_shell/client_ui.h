@@ -119,6 +119,10 @@ private:
   // here so they survive across frames. The IR builder reads + updates them.
   ::ui::InputScrollStore input_scroll_ = {};
   ::ui::NodeId prev_hovered_node_ = 0;
+  // Text-selection drag capture: the input the press started on keeps receiving
+  // Drag events while the button is held, even after the pointer leaves it.
+  ::ui::NodeId text_drag_node_ = 0;
+  float text_drag_last_x_ = 0.0f;
   std::array<QueuedMutation, CLIENT_UI_MAX_QUEUED_MUTATIONS> mutations_ = {};
   int mutation_count_ = 0;
   bool structural_hold_ = false;

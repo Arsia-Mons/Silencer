@@ -555,6 +555,7 @@ set(_cppx_retained_sources
 	src/ui/runtime/react.cpp
 	src/ui/runtime/element.cpp
 	src/ui/runtime/tree.cpp
+	src/ui/runtime/clipboard.cpp
 	src/ui/runtime/focus.cpp
 	src/ui/runtime/interaction_hooks.cpp
 	src/ui/runtime/flex_layout.cpp
@@ -611,6 +612,25 @@ if(MSVC)
 	target_compile_definitions(ui_pipeline_tests PRIVATE NOMINMAX)
 endif()
 add_test(NAME ui_pipeline_tests COMMAND ui_pipeline_tests)
+
+# Issue #336: the Input component's OS text-editing model (word/line chords,
+# selection, clipboard via a fake seam, pointer caret placement + drag
+# selection) driven headlessly through ClientUi. SDL-free: the generated
+# components layer + the retained closure; no measurer => 8px/byte advances.
+add_executable(ui_input_editing_tests
+	tests/ui_input_editing_tests.cpp
+	src/client/ui/app_shell/ui_pipeline.cpp
+	${_cppx_app_shell_sources}
+	${_cppx_retained_sources}
+	${SILENCER_CPPX_GENERATED})
+target_compile_features(ui_input_editing_tests PRIVATE cxx_std_20)
+target_include_directories(ui_input_editing_tests PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/src" ${SILENCER_CPPX_INCLUDE_DIRS})
+target_link_libraries(ui_input_editing_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(ui_input_editing_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_input_editing_tests COMMAND ui_input_editing_tests)
 
 # --- Production render seam: PipelineHost (SIL-14) ------------------------
 # Drives the real client::ui::UiPipeline and executes its IR to pixels via the

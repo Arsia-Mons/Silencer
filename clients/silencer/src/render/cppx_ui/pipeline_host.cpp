@@ -4,6 +4,7 @@
 #include "draw_executor.h"
 #include "sprite_bake.h"
 #include "text_measure.h"
+#include "ui/runtime/clipboard.h"
 #include "ui_draw_geometry.h"
 #include "ui_draw_program_builder.h"
 
@@ -16,6 +17,25 @@
 #include <stdlib.h>
 
 namespace silencer::cppx_ui {
+
+namespace {
+
+// OS clipboard handlers for the SDL-free ui::clipboard seam. SDL talks to the
+// native pasteboard; without a video subsystem the calls fail soft (no-op).
+void sdl_clipboard_write(const char *utf8) { SDL_SetClipboardText(utf8); }
+
+bool sdl_clipboard_read(std::string &out) {
+  if (!SDL_HasClipboardText())
+    return false;
+  char *text = SDL_GetClipboardText();
+  if (!text)
+    return false;
+  out = text;
+  SDL_free(text);
+  return true;
+}
+
+} // namespace
 
 PipelineHost::PipelineHost() = default;
 
@@ -68,6 +88,7 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
     if (!fonts_.load_faces(font_dir))
       return false;
     install_text_measurer(&fonts_, &glyph_fonts_);
+    ::ui::set_clipboard_handlers(&sdl_clipboard_write, &sdl_clipboard_read);
   }
   if (!ui_.initialize(r_, fonts_))
     return false;

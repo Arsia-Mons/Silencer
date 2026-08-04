@@ -79,6 +79,7 @@ struct HostCallbacks {
   std::function<void(const WheelEvent &)> on_wheel = {};
   std::function<void(const TextInputEvent &)> on_text_input = {};
   std::function<void(const TextEditingEvent &)> on_text_editing = {};
+  std::function<void(const TextPointerEvent &)> on_text_pointer = {};
 };
 
 struct HostProps {

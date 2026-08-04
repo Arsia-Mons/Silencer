@@ -41,6 +41,9 @@ struct InputFrame {
   bool pointer_valid = false;
   float pointer_x = 0.0f;
   float pointer_y = 0.0f;
+  // Press-edge detail (see UiInputFrame): OS click streak + modifiers at press.
+  int pointer_clicks = 0;
+  uint16_t pointer_mods = ::ui::UI_KEY_MOD_NONE;
 
   // +y = wheel up; routed to the hovered scrollable.
   float wheel_x = 0.0f;

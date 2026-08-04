@@ -125,6 +125,7 @@ private:
         .on_key = props.callbacks.on_key,
         .on_text_input = props.callbacks.on_text_input,
         .on_text_editing = props.callbacks.on_text_editing,
+        .on_text_pointer = props.callbacks.on_text_pointer,
         .on_wheel = props.callbacks.on_wheel,
     };
     bool metadata_ok = tree_.set_metadata(id, metadata);
