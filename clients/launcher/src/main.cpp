@@ -308,6 +308,13 @@ int main(int, char **) {
   }
   uint32_t bg_id = 0;
 
+  // The canonical logo (bank 208 frame 60), baked alongside the backdrop.
+  launcher::Background logo;
+  const bool have_logo = launcher::load_logo(assets_dir(), &logo);
+  if (!have_logo)
+    fprintf(stderr, "[launcher] logo: unavailable, falling back to text\n");
+  uint32_t logo_id = 0;
+
   SDL_Texture *tex = nullptr;
   int tex_w = 0, tex_h = 0;
 
@@ -524,10 +531,21 @@ int main(int, char **) {
           fprintf(stderr, "[launcher] backgrounds: bake failed (%dx%d)\n", bg.w,
                   bg.h);
       }
+      if (have_logo) {
+        logo_id =
+            host.bake_chrome_sprite(logo.indices.data(), logo.w, logo.h, logo.palette);
+        if (!logo_id)
+          fprintf(stderr, "[launcher] logo: bake failed (%dx%d)\n", logo.w, logo.h);
+      }
       host.mark_chrome_baked();
     }
     if (!bg.indices.empty())
       vm.bg_texture = bg_id;
+    if (have_logo) {
+      vm.logo_texture = logo_id;
+      vm.logo_w = logo.w;
+      vm.logo_h = logo.h;
+    }
 
     client::ui::UiPipelineFrame frame = {};
     frame.input = in;

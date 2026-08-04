@@ -215,6 +215,32 @@ std::vector<Background> load_backgrounds(const std::string &assets_dir) {
   return out;
 }
 
+bool load_logo(const std::string &assets_dir, Background *out) {
+  constexpr int kLogoBank = 208;
+  constexpr int kLogoHeldFrame = 60; // the reveal's final, fully-drawn frame
+
+  const std::vector<uint8_t> counts = read_file(assets_dir + "/BIN_SPR.DAT");
+  const std::vector<uint8_t> pal_raw = read_file(assets_dir + "/PALETTE.BIN");
+  if (counts.empty() || pal_raw.empty())
+    return false;
+
+  const std::vector<Sprite> sprites = decode_bank(assets_dir, counts, kLogoBank);
+  if ((size_t)kLogoHeldFrame >= sprites.size()) {
+    fprintf(stderr, "[launcher] logo: bank %d has no frame %d\n", kLogoBank,
+            kLogoHeldFrame);
+    return false;
+  }
+  const Sprite &s = sprites[kLogoHeldFrame];
+  if (s.w <= 0 || s.h <= 0 || s.px.empty())
+    return false;
+
+  out->w = s.w;
+  out->h = s.h;
+  out->indices = s.px;
+  read_palette_page(pal_raw, 0, out->palette);
+  return true;
+}
+
 bool bake_glyph_faces(silencer::cppx_ui::PipelineHost &host,
                       const std::string &assets_dir) {
   using GF = silencer::cppx_ui::GlyphFonts;

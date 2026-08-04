@@ -40,6 +40,10 @@ struct ViewModel {
   // Backdrop texture for this frame (0 = plain fill). main() owns the bake +
   // the shuffle/cycle; the view just draws whatever id it is handed.
   uint32_t bg_texture = 0;
+  // Canonical SILENCER logo (bank 208 frame 60); 0 = fall back to a text
+  // wordmark. Native size travels with it so the topbar can hold the aspect.
+  uint32_t logo_texture = 0;
+  int logo_w = 0, logo_h = 0;
 };
 
 extern ReactContext LauncherContext; // current = const ViewModel*

@@ -68,9 +68,15 @@ constexpr Color kScrim = {3, 6, 3, 170};
 // Body=0 (bank 133), Large=1 (134), Title=2 (136), Tiny=3 (132), Heading=4
 // (135). Text is pixel-perfect ONLY at the face's native line height (or an
 // integer multiple): Body 11, Large 15, Title 23, Tiny 7, Heading 19.
-constexpr uint16_t kFaceBody = 0;
+//
+// The whole UI draws in Title (bank 136) by choice. It is authored at the
+// 11/19px sizes the layout was built around, NOT Title's native 23 — so the
+// glyph cells nearest-scale down (0.48x / 0.83x) instead of blitting 1:1.
+// That is deliberate; going pixel-perfect means re-tuning every wrap width
+// and the 900x600 window for Title's 16px advance.
+constexpr uint16_t kFaceBody = 2;
 constexpr uint16_t kFaceTitle = 2;
-constexpr uint16_t kFaceHeading = 4;
+constexpr uint16_t kFaceHeading = 2;
 
 // Detail-pane text wrap width (Yoga wraps only at a definite points width).
 // 900 window − 36 root pad − 32 panel pad − 220 list − 12 gap − 28 detail pad
@@ -173,14 +179,24 @@ StyleStatePatch toggle_button(bool selected) {
   return sp;
 }
 
-// Borderless text link (topbar WEBSITE/DISCORD). The zero-width border
-// overrides the Button role's default box.
+// Flat text link (topbar WEBSITE/DISCORD) — the lowest-traffic controls in the
+// bar, so they carry no box at rest and only light up under the cursor.
+//
+// Built on Box, not Button, for two reasons:
+//   1. A Button host paints a faint box regardless of the style patch (a
+//      zero-width border does not suppress it), which is exactly the weight
+//      these links should not carry. theme.box is blank, so a Box draws only
+//      what it is told to.
+//   2. Button renders `label` as a plain child, so the resolved visual's text
+//      never reaches it and a `.text()` patch is silently dead. Both link
+//      styles here therefore live on background, and the label comes in as an
+//      explicitly styled Text child.
+// Hover is a wash rather than a border so nothing reflows by a pixel.
 StyleStatePatch link_button() {
-  Border none{{0, 0, 0, 0}, {}};
   StyleStatePatch sp{};
-  sp.base = ::ui::patch().background(Color{0, 0, 0, 0}).border(none)
-                .text(tv(kTextFaint, 11, kFaceBody, TextAlign::Center));
-  sp.hover = ::ui::patch().text(tv(kAccent, 11, kFaceBody, TextAlign::Center));
+  sp.base = ::ui::patch().background(Color{0, 0, 0, 0}).corner_radius(3.0f);
+  sp.hover = ::ui::patch().background(kAccentFaint);
+  sp.pressed = ::ui::patch().background(Color{16, 40, 20, 200});
   sp.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccent, 2.0f});
   return sp;
 }
@@ -708,19 +724,25 @@ UiElement top_bar(const AppSnapshot &s, const Intents &in, UiState *st) {
   bar.style = panel_style(kPanel, kBorder, 4.0f);
 
   auto link = [&](const char *key, const char *text, const char *url) {
-    ButtonProps b{};
+    BoxProps b{};
     b.key = key;
-    b.label = text;
     b.style = link_button();
+    b.focusable = true;
+    b.accessibility.role = ::ui::SemanticRole::Button; // no Link role exists
+    b.accessibility.label = text;
     b.layout.height = Length::points(24);
+    b.layout.padding = EdgeSizes{10, 10, 0, 0};
     b.layout.align_items = AlignItems::Center;
     b.layout.justify_content = JustifyContent::Center;
+    // Styled child, not a Button label — see link_button().
+    b.children = ::ui::children({label(dup(std::string(key) + "-t"), text, kTextFaint, 11,
+                                       kFaceBody, TextAlign::Center)});
     std::string u = url;
     b.on_activate = [&in, u](const ::ui::ActivationEvent &) {
       if (in.open_url)
         in.open_url(u);
     };
-    return MkButton(b);
+    return MkBox(b);
   };
 
   // Account chip: SIGN IN (out) / USERNAME (in) — toggles the popover.
@@ -749,10 +771,32 @@ UiElement top_bar(const AppSnapshot &s, const Intents &in, UiState *st) {
     acct.label = "SIGN IN";
   }
 
+  // The canonical logo sprite, height-fitted into the 48px bar with its native
+  // aspect preserved. Falls back to the text wordmark when the assets are
+  // missing (same condition that leaves the backdrop a plain fill).
+  const ViewModel &vm = use_launcher();
   UiElement title = label("title", "SILENCER", kText, 23, kFaceTitle);
-  bar.children = ::ui::children({title, link("lnk-web", "WEBSITE", "https://arsiamons.com"),
-                                 link("lnk-discord", "DISCORD", "https://discord.gg/silencer"),
-                                 spacer("tb-gap"), MkButton(acct)});
+  if (vm.logo_texture && vm.logo_w > 0 && vm.logo_h > 0) {
+    constexpr float kLogoH = 28.0f;
+    ::ui::BackgroundImage img{};
+    img.texture_id = vm.logo_texture;
+    img.fit = ::ui::ImageFit::Contain;
+
+    BoxProps mark{};
+    mark.key = "title-logo";
+    mark.layout.height = Length::points(kLogoH);
+    mark.layout.width =
+        Length::points(kLogoH * (float)vm.logo_w / (float)vm.logo_h);
+    mark.style = ::ui::patch().image(img);
+    title = MkBox(mark);
+  }
+  // The links are secondary: parked on the right next to the account chip
+  // rather than beside the logo, and faint until hovered.
+  bar.children = ::ui::children({title, spacer("tb-gap"),
+                                 link("lnk-web", "WEBSITE", "https://arsiamons.com"),
+                                 link("lnk-discord", "DISCORD",
+                                      "https://discord.gg/YHb5wJUCpp"),
+                                 MkButton(acct)});
   return MkBox(bar);
 }
 

@@ -29,6 +29,13 @@ struct Background {
 // that fail to load are skipped; an empty vector means no assets found.
 std::vector<Background> load_backgrounds(const std::string &assets_dir);
 
+// Decodes the canonical SILENCER logo — bank 208 frame 60, the final frame of
+// the main menu's reveal animation (see ChromeTextures::kLogoHeldFrame in
+// clients/silencer/src/client/ui/hooks/use_chrome.h). Palette page 0, matching
+// the game's page_for_bank default for bank 208. Returns false if the bank
+// can't be decoded; `out` is untouched then.
+bool load_logo(const std::string &assets_dir, Background *out);
+
 // Bakes the origin bitmap glyph fonts (banks 132-136) into the host's
 // GlyphFonts atlases — the same faces the game bakes, so text renders from
 // origin's glyph pixels instead of the TTF reconstructions. Re-call whenever
