@@ -329,6 +329,11 @@ void parse_releases(const std::string &body, std::vector<Release> *stable,
     Release rel;
     std::string tag = r.value("tag_name", std::string());
     std::string name = r.value("name", std::string());
+    // This tab lists GAME releases. The launcher ships from the same repo on
+    // its own `launcher-*` tag, and that release is a non-prerelease, so
+    // without this it would sit in the STABLE list labelled with its raw tag.
+    if (tag.rfind("launcher-", 0) == 0)
+      continue;
     rel.prerelease = r.value("prerelease", false);
     // Stable tags are "vNNNNN"; the nightly prerelease tag is just "latest",
     // whose display name ("Latest master (sha)") is the better label.

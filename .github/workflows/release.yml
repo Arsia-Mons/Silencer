@@ -255,247 +255,6 @@ jobs:
           path: build/silencer-macos-arm64.dmg
           if-no-files-found: error
 
-  build-launcher-macos:
-    # Same macos-15 pin as build-macos, for the same reason (the newer dyld's
-    # duplicate-LC_RPATH abort). Like build-macos, the job gates on a headless
-    # self-update e2e before anything is signed: a broken launcher updater is
-    # worse than a broken game updater, because the launcher can repair the
-    # game but nothing in-app repairs the launcher.
-    runs-on: macos-15
-    timeout-minutes: 45
-    needs: version
-    if: needs.version.outputs.skip != 'true'
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
-      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install create-dmg
-        # Release-only; the composite installs dylibbundler.
-        run: brew install create-dmg
-
-      - name: Build launcher
-        uses: ./.github/actions/build-launcher-macos
-        with:
-          launcher-version: ${{ env.SILENCER_VERSION }}
-          launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
-          build-dir: build-launcher
-
-      - name: Launcher self-update e2e (headless)
-        # OLD = the just-built (still unsigned) release bundle; NEW = a second
-        # build versioned 99999 (sccache-warm off the release objects). Runs on
-        # a scratch copy of the bundle, so the shipped artifact stays pristine.
-        # Unsigned OLD means the Developer ID payload check exercises its skip
-        # path here; the enforce path needs a signed running build.
-        env:
-          OLD_BUILD_DIR: ${{ github.workspace }}/build-launcher
-        run: bash infra/scripts/test-launcher-updater.sh
-
-      - name: Import Developer ID cert
-        env:
-          CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
-          CERT_P12_PASSWORD: ${{ secrets.APPLE_CERT_P12_PASSWORD }}
-        run: |
-          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
-          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
-          echo "$CERT_P12_BASE64" | base64 --decode > /tmp/cert.p12
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -lut 21600 build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security import /tmp/cert.p12 -P "$CERT_P12_PASSWORD" \
-            -A -t cert -f pkcs12 -k build.keychain
-          security list-keychains -d user -s build.keychain \
-            $(security list-keychains -d user | tr -d '"')
-          security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          rm /tmp/cert.p12
-          security find-identity -v -p codesigning build.keychain
-
-      - name: Codesign with Developer ID
-        working-directory: build-launcher
-        run: |
-          IDENTITY="Developer ID Application"
-          # Sign inside-out: dylibs first, then the main binary, then the
-          # bundle. This MUST come after package-macos.sh's last
-          # install_name_tool edit — an rpath edit invalidates a Mach-O
-          # signature and Apple Silicon then SIGKILLs the binary with exit 137
-          # and no output at all. --force overrides the ad-hoc signature the
-          # script applied. --options runtime (Hardened Runtime) + --timestamp
-          # are both required by notarytool.
-          #
-          # "Silencer Launcher.app" has a space: every path below is quoted,
-          # and the find pipe uses -print0/-0 for the same reason.
-          find "Silencer Launcher.app/Contents/Frameworks" -name "*.dylib" -print0 \
-            | xargs -0 -n1 codesign --force --timestamp --options runtime \
-              --sign "$IDENTITY"
-          codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" "Silencer Launcher.app/Contents/Helpers/updater-stage-2"
-          codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" "Silencer Launcher.app/Contents/MacOS/Silencer Launcher"
-          codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" "Silencer Launcher.app"
-          codesign --verify --deep --strict --verbose=2 "Silencer Launcher.app"
-
-      - name: Notarize and staple
-        working-directory: build-launcher
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          ditto -ck --keepParent "Silencer Launcher.app" /tmp/notarize-launcher.zip
-          xcrun notarytool submit /tmp/notarize-launcher.zip \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
-          rm /tmp/notarize-launcher.zip
-          xcrun stapler staple "Silencer Launcher.app"
-          xcrun stapler validate "Silencer Launcher.app"
-          spctl -a -vv -t execute "Silencer Launcher.app"
-
-      - name: Zip the stapled bundle for self-update
-        working-directory: build-launcher
-        # Self-update consumes a zip, not the DMG — the same shape the game's
-        # updater takes, so updaterzip.cpp extracts it with ditto unchanged.
-        # Zipped AFTER stapling, so a self-updated launcher carries its own
-        # notarization ticket and launches offline exactly like a DMG install.
-        run: |
-          ditto -ck --keepParent --sequesterRsrc \
-            "Silencer Launcher.app" silencer-launcher-macos-arm64.zip
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launcher-macos-arm64-zip
-          path: build-launcher/silencer-launcher-macos-arm64.zip
-          if-no-files-found: error
-
-      - name: Build, sign, notarize, staple DMG
-        working-directory: build-launcher
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        # --app-drop-link is the /Applications symlink, so the Finder window
-        # shows the drag-to-install affordance. The .app inside is already
-        # stapled, so the DMG and its payload each carry their own notarization
-        # ticket and both launch offline.
-        run: |
-          create-dmg \
-            --volname "Silencer Launcher" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --icon "Silencer Launcher.app" 175 200 \
-            --hide-extension "Silencer Launcher.app" \
-            --app-drop-link 425 200 \
-            silencer-launcher-macos-arm64.dmg \
-            "Silencer Launcher.app"
-          codesign --force --timestamp \
-            --sign "Developer ID Application" \
-            silencer-launcher-macos-arm64.dmg
-          xcrun notarytool submit silencer-launcher-macos-arm64.dmg \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
-          xcrun stapler staple silencer-launcher-macos-arm64.dmg
-          xcrun stapler validate silencer-launcher-macos-arm64.dmg
-          spctl -a -vv -t open --context context:primary-signature \
-            silencer-launcher-macos-arm64.dmg
-
-      - name: Clean up keychain
-        if: always()
-        run: |
-          security delete-keychain build.keychain || true
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launcher-macos-arm64-dmg
-          path: build-launcher/silencer-launcher-macos-arm64.dmg
-          if-no-files-found: error
-
-  build-launcher-windows:
-    runs-on: windows-latest
-    timeout-minutes: 60
-    needs: version
-    if: needs.version.outputs.skip != 'true'
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
-      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build launcher
-        uses: ./.github/actions/build-launcher-windows
-        with:
-          launcher-version: ${{ env.SILENCER_VERSION }}
-          launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
-          build-dir: build-launcher
-
-      - name: Zip portable bundle
-        shell: pwsh
-        run: Compress-Archive -Path "build-launcher/package/silencer-launcher" -DestinationPath build-launcher/silencer-launcher-windows-x64.zip -Force
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launcher-windows-x64
-          path: build-launcher/silencer-launcher-windows-x64.zip
-          if-no-files-found: error
-
-      - name: Install Inno Setup
-        run: choco install innosetup -y --no-progress
-
-      - name: Build installer
-        shell: pwsh
-        # Not signed. Same as the game's installer — SmartScreen will warn on
-        # first run, and the release notes say so.
-        run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-            "/DMyAppVersion=$env:SILENCER_VERSION" `
-            clients/launcher/installer/silencer-launcher.iss
-          if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed" }
-          # ISCC writes to <iss-dir>/Output by default. Hoist it so the
-          # upload-artifact glob picks it up.
-          Move-Item clients/launcher/installer/Output/*.exe build-launcher/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launcher-windows-x64-setup
-          path: build-launcher/silencer-launcher-windows-x64-setup-*.exe
-          if-no-files-found: error
-
-  build-launcher-linux:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: version
-    if: needs.version.outputs.skip != 'true'
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
-      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build launcher
-        uses: ./.github/actions/build-launcher-linux
-        with:
-          launcher-version: ${{ env.SILENCER_VERSION }}
-          launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
-          build-dir: build-launcher
-
-      - name: Package
-        run: tar czf build-launcher/silencer-launcher-linux-x64.tar.gz -C build-launcher/package silencer-launcher
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launcher-linux-x64
-          path: build-launcher/silencer-launcher-linux-x64.tar.gz
-          if-no-files-found: error
-
   build-windows:
     runs-on: windows-latest
     timeout-minutes: 60
@@ -589,11 +348,8 @@ jobs:
     needs:
       - version
       - build-macos
-      - build-launcher-macos
       - build-windows
-      - build-launcher-windows
       - build-linux
-      - build-launcher-linux
     if: needs.version.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -652,32 +408,6 @@ jobs:
             > update.json
           cat update.json
 
-      - name: Build launcher update manifest
-        # The launcher's own manifest, served at /api/launcher/manifest/self
-        # and consumed by its self-updater. Separate from update.json because
-        # it describes a different payload: the launcher ships on one track,
-        # so this follows stable releases only.
-        #
-        # macOS only for now — self-update on Windows and Linux needs the
-        # stage-2 branches proven on those platforms first, and a URL here that
-        # nothing can install would present the user an update that always
-        # fails.
-        run: |
-          set -euo pipefail
-          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.meta.outputs.tag }}"
-          mac_zip=artifacts/launcher-macos-arm64-zip/silencer-launcher-macos-arm64.zip
-          [[ -f "$mac_zip" ]] || { echo "missing artifact: $mac_zip" >&2; exit 1; }
-          jq -n \
-            --arg version   "$PROTOCOL" \
-            --arg build_id  "$BUILD_ID" \
-            --arg channel   "$CHANNEL" \
-            --arg macos_url "$base/silencer-launcher-macos-arm64.zip" \
-            --arg macos_sha "$(sha256sum "$mac_zip" | cut -d' ' -f1)" \
-            '{version: $version, build_id: $build_id, channel: $channel,
-              macos_url: $macos_url, macos_sha256: $macos_sha}' \
-            > update-launcher.json
-          cat update-launcher.json
-
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
@@ -688,18 +418,12 @@ jobs:
           files: |
             artifacts/macos-arm64/*
             artifacts/macos-arm64-dmg/*
-            artifacts/launcher-macos-arm64-dmg/*
             artifacts/windows-x64/*
             artifacts/windows-x64-setup/*
-            artifacts/launcher-windows-x64/*
-            artifacts/launcher-windows-x64-setup/*
             artifacts/linux-x64/*
-            artifacts/launcher-linux-x64/*
-            artifacts/launcher-macos-arm64-zip/*
             update.json
-            update-launcher.json
           body: |
-            ## Downloads — game
+            ## Downloads
 
             - **macOS (Apple Silicon) — DMG (recommended):** `silencer-macos-arm64.dmg` (drag to Applications)
             - **macOS (Apple Silicon) — portable zip:** `silencer-macos-arm64.zip`
@@ -707,14 +431,8 @@ jobs:
             - **Windows (x64) — portable zip:** `silencer-windows-x64.zip`
             - **Linux (x64):** `silencer-linux-x64.tar.gz`
 
-            ## Downloads — launcher
-
-            Installs and launches the game for you, and shows news and releases.
-
-            - **macOS (Apple Silicon) — DMG:** `silencer-launcher-macos-arm64.dmg` (drag to Applications)
-            - **Windows (x64) — installer:** `silencer-launcher-windows-x64-setup-*.exe`
-            - **Windows (x64) — portable zip:** `silencer-launcher-windows-x64.zip`
-            - **Linux (x64):** `silencer-launcher-linux-x64.tar.gz`
+            The launcher installs and runs the game for you, and updates itself.
+            It ships on its own tag: https://github.com/Arsia-Mons/Silencer/releases/tag/launcher-latest
 
             ## First-run warnings
 

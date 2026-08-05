@@ -22,6 +22,8 @@ Data sources:
 - **Releases** — the GitHub Releases API: stable = non-prereleases,
   nightly = the `latest` prerelease; "What's Changed" bullets are
   cleaned (markdown links stripped, `by @user in url` trailers cut).
+  `launcher-*` tags are filtered out — this tab lists *game* releases,
+  and the launcher's own release shares the repo as a non-prerelease.
 - **Sign-in** — real TCP `opAuth` via the lobby SDK (auto-registers new
   usernames; the version handshake is skipped). Session handoff to the
   game and persisted auth are future phases — the game still prompts.
@@ -122,7 +124,7 @@ the resources travel with the binary and codesigning has something to sign) /
 **The macOS bundle name has a space in it.** `OUTPUT_NAME` is
 `Silencer Launcher`, so the binary is `Contents/MacOS/Silencer Launcher` and
 the Finder name matches `CFBundleName`. Every path in `package-macos.sh`, the
-CI action and `release.yml` is quoted for that reason, and the CI signing step
+CI action and `release-launcher.yml` is quoted for that reason, and the CI signing step
 uses `find -print0 | xargs -0`. An unquoted path splits at the space and fails
 on a *component*, which reads as a puzzling "no such file". Windows and Linux
 keep the hyphenated `silencer-launcher` — the space buys nothing without a
@@ -132,8 +134,8 @@ The bundle's `Info.plist` comes from `SilencerLauncher-Info.plist`, and its
 icon is `shared/icons/icon.icns` — the game's icon, shared on purpose: one
 product, one mark in the Dock. The version is **not a literal anywhere**:
 `-DSILENCER_LAUNCHER_VERSION` fills `CFBundleShortVersionString` and
-`CFBundleVersion`, `release.yml` passes `${GITHUB_REF_NAME#v}`, and a local
-build gets `00000`.
+`CFBundleVersion`, `release-launcher.yml` passes `${GITHUB_REF_NAME#launcher-v}`,
+and a local build gets `00000`.
 
 Two plist keys are Xcode-generator-only and come out **empty** under Ninja —
 `${EXECUTABLE_NAME}` and `${MACOSX_DEPLOYMENT_TARGET}`, which is why this
@@ -177,7 +179,8 @@ game — keep the two in step.
 ## CI
 
 `ci-build-launcher-{macos,windows,linux}.yml` build the launcher on every
-relevant PR, through the **same composite actions** `release.yml` uses, then
+relevant PR, through the **same composite actions** `release-launcher.yml`
+uses, then
 run `tests/e2e/check-bundle-*` over the result. Their path allowlist includes
 the `clients/silencer/` subtrees this `CMakeLists.txt` compiles by absolute
 path — a change there can break the launcher while every game check stays
@@ -191,15 +194,38 @@ behaves exactly as before.
 
 ## Distribution
 
-Three release jobs in `release.yml`, one per platform, each on a `v*` tag
-alongside its game counterpart. All three build into `build-launcher/`, never
-`build/`, so a launcher job and a game job never collide.
+**The launcher ships on its own tag, independent of the game.**
+`.github/workflows/release-launcher.yml`, three jobs, one per platform, on a
+`launcher-v*` tag. To cut a release:
+
+```
+git tag launcher-v00001 && git push origin launcher-v00001
+```
 
 | Job | Composite action | Artifacts |
 |---|---|---|
-| `build-launcher-macos` | `build-launcher-macos` | `silencer-launcher-macos-arm64.dmg` |
-| `build-launcher-windows` | `build-launcher-windows` | `silencer-launcher-windows-x64.zip`, `silencer-launcher-windows-x64-setup-*.exe` |
-| `build-launcher-linux` | `build-launcher-linux` | `silencer-launcher-linux-x64.tar.gz` |
+| `build-macos` | `build-launcher-macos` | `silencer-launcher-macos-arm64.dmg`, `silencer-launcher-macos-arm64.zip` |
+| `build-windows` | `build-launcher-windows` | `silencer-launcher-windows-x64.zip`, `silencer-launcher-windows-x64-setup-*.exe` |
+| `build-linux` | `build-launcher-linux` | `silencer-launcher-linux-x64.tar.gz` |
+
+All three build into `build-launcher/`, never `build/` — a habit kept from
+when these jobs lived in `release.yml` beside the game's, and still worth
+keeping so a local launcher build never stomps a local game build.
+
+The version is the **launcher's own counter**, from
+`${GITHUB_REF_NAME#launcher-v}`. It is not the game's wire protocol number.
+While these jobs rode `release.yml`, `CFBundleShortVersionString` and the
+Windows VERSIONINFO quad carried the number the lobby enforces against
+connecting *game* clients — a protocol the launcher never speaks. `build_id`
+equals the version here: on the game side the two differ only to tell two
+nightlies apart, and the launcher has none.
+
+Output goes to a **rolling release at the fixed tag `launcher-latest`**, one
+release object that always holds the current build. Every URL it serves is
+baked into something that cannot be re-pointed later — `manifest_url_launcher`
+is compiled into every launcher already in a user's hands, and the website's
+download links are published. Version history lives in the `launcher-v*` git
+tags and the CHANGELOG, not in a wall of release objects.
 
 Only macOS is signed. Windows and Linux ship unsigned, same as the game's, and
 the release notes tell users what SmartScreen will say.
@@ -213,7 +239,7 @@ so this fails in CI rather than in a user's hands.
 
 ### macOS
 
-`release.yml`'s **`build-launcher-macos`** job is the whole pipeline:
+`release-launcher.yml`'s **`build-macos`** job is the whole pipeline:
 
 `.github/actions/build-launcher-macos` (configure + build + `package-macos.sh`)
 → import the Developer ID cert → codesign inside-out with
@@ -281,8 +307,11 @@ exercised them). The mechanism decision is
 The flow, all in `src/app.cpp` + `main.cpp`:
 
 1. `run_refresh` fetches `manifest_url_launcher` and compares the manifest's
-   `build_id` (never `version` — two nightlies share the protocol number)
-   against the compiled-in `SILENCER_LAUNCHER_BUILD_ID`.
+   `build_id` against the compiled-in `SILENCER_LAUNCHER_BUILD_ID`. The
+   comparison is **inequality, not ordering**, which is what let the launcher's
+   counter restart at `00001` when it stopped borrowing the game's protocol
+   number: a launcher carrying the old `00062+nightly.*` id still sees `00001`
+   as different, and updates.
 2. A mismatch with a `macos_url` shows the topbar's `UpdateChip` AppButton.
    Click → `App::self_update()`: download, sha256 verify, then the Developer
    ID check — the payload-signing property Sparkle would have given. The
@@ -298,7 +327,8 @@ Stage-2 itself is the game's `updaterstage2.cpp`, reused verbatim — every
 path arrives through argv, nothing in it is game-specific. The launcher only
 adds its own `Contents/Helpers/updater-stage-2` helper target (the exact path
 macOS `Launch()` hardcodes; never synthesize a temp `.app` at runtime —
-Gatekeeper assesses that as newly downloaded code). `release.yml` signs and
+Gatekeeper assesses that as newly downloaded code). `release-launcher.yml`
+signs and
 notarizes the helper like the game's, and gates the launcher release on
 `infra/scripts/test-launcher-updater.sh` — a headless e2e where the just-built
 launcher self-updates to a `99999` build and the auto-relaunched process
@@ -396,8 +426,10 @@ prototypes could share; Tauri is gone, so the contract went with it.)
 Keys: `channel`, `base_dir`,
 `installed_stable`, `installed_nightly`, `manifest_url_stable`,
 `manifest_url_nightly`, `manifest_url_launcher` (the launcher's **own**
-build, for self-update — not a game channel, so it follows stable releases
-only), `announcements_url` (the shared/news v2 feed —
+build, for self-update — not a game channel, so it has one track and
+follows the `launcher-latest` rolling release, **not**
+`/releases/latest/download/`, which resolves to a game tag that carries no
+`update-launcher.json`), `announcements_url` (the shared/news v2 feed —
 production default `https://arsiamons.com/announcements.json`),
 `releases_url` (GitHub Releases API), `lobby_host`, `lobby_port`. Each
 

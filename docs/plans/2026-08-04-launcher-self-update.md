@@ -127,7 +127,7 @@ lines, using the signing we are already doing for Gatekeeper.
 
 1. `manifest_url_launcher` in `launcher.json` +
    `/api/launcher/manifest/self` in `services/admin-api`. Done earlier.
-2. `release.yml` publishes `silencer-launcher-macos-arm64.zip` (zipped
+2. `release-launcher.yml` publishes `silencer-launcher-macos-arm64.zip` (zipped
    after stapling) + `update-launcher.json`. Done earlier.
 3. The flow in `src/app.cpp`: fetch the manifest, compare its
    `build_id` against the compiled-in `SILENCER_LAUNCHER_BUILD_ID`,

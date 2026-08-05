@@ -46,7 +46,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$base" HEAD | grep -Ev \
-               '^(services/|web/|infra/|docs/|designer/|shared/(design|skills)/|[^/]+\.md$|\.gitignore$|\.github/workflows/(ci-build-admin-[^/]*|ci-build-lobby-docker|deploy[^/]*|release)\.yml$)' \
+               '^(services/|web/|infra/|docs/|designer/|shared/(design|skills)/|[^/]+\.md$|\.gitignore$|\.github/workflows/(ci-build-admin-[^/]*|ci-build-lobby-docker|deploy[^/]*|release(-launcher)?)\.yml$)' \
                | grep -q .; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else

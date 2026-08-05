@@ -2,7 +2,8 @@
 
 Nine CI builds (five required by branch protection on `main`;
 `build-linux` and the three `build-launcher-*` are optional until
-added), three deploys, one release.
+added), three deploys, two releases (the game and the launcher ship
+independently).
 Path filters for the CI builds live **inside the job**, not in
 `on:` — see "Required check trap" below.
 
@@ -41,7 +42,7 @@ macOS / Windows / Linux denylist (skip the build when **only**
 these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 `shared/{design,skills}/`, top-level `*.md`, `.gitignore`,
 `ci-build-admin-*.yml`, `ci-build-lobby-docker.yml`,
-`deploy*.yml`, `release.yml`.
+`deploy*.yml`, `release.yml`, `release-launcher.yml`.
 
 ## Deploys
 
@@ -55,7 +56,14 @@ these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 
 | Workflow | Triggers (`on:`) |
 |---|---|
-| `release.yml` | push of `v*` tag, nightly cron (07:00 UTC), or manual dispatch |
+| `release.yml` (game) | push of `v*` tag, nightly cron (07:00 UTC), or manual dispatch |
+| `release-launcher.yml` (launcher) | push of `launcher-v*` tag, or manual dispatch |
+
+**The two are independent, and that split is the point.** The game has two
+tracks (stable + nightly); the launcher has one. Cutting a launcher release is
+`git tag launcher-v00001 && git push --tags` — no game rebuild, no
+notarization round-trip for the game, and no bump to the wire protocol number
+the lobby enforces.
 
 ### The `version` job — two version strings, not one
 
@@ -108,10 +116,8 @@ resolved to a 404 in production. Its shape is
 `services/lobby/update.go`'s `manifestFile` plus `build_id` and
 `channel`, which only the launcher reads; Go ignores the extra fields.
 
-`release.yml` jobs: a `version` job, then six parallel builds — `build-macos`,
-`build-windows`, `build-linux` for the game and
-`build-launcher-macos`, `build-launcher-windows`,
-`build-launcher-linux` for the launcher
+`release.yml` jobs: a `version` job, then three parallel builds —
+`build-macos`, `build-windows`, `build-linux`
 → `release` (creates the GitHub Release) → `publish-npm`
 (stages and publishes the five npm packages described in
 `clients/tui/CLAUDE.md`).
@@ -125,22 +131,52 @@ the new version relaunches — gating the release on a working self-updater
 and needs `oven-sh/setup-bun` (the harness drives the game via `clients/cli`).
 `build-linux` has no such step (Linux isn't a shipped self-update platform).
 
-The three `build-launcher-*` jobs build `clients/launcher/` into
-`build-launcher/`, never `build/`, so a launcher job and a game job
-cannot collide on artifacts.
+### `release-launcher.yml`
 
-- `build-launcher-macos` gates on its own self-update e2e
+Jobs: a `version` job, then `build-macos`, `build-windows`, `build-linux` (the
+launcher's, all three building into `build-launcher/`) → `release`.
+
+These three jobs used to live in `release.yml`, gated only on its `version`
+job's `skip` output. Nothing stopped the nightly cron from running them, so the
+launcher published nightlies it was never designed to have — straight into the
+`latest` prerelease, contradicting the "one track" comment sitting directly
+above the manifest step. **`release-launcher.yml` has no cron**, which is what
+keeps that from coming back.
+
+The `version` job emits **one** string, not the game's two. The launcher speaks
+no wire protocol, so it carries its own counter from
+`${GITHUB_REF_NAME#launcher-v}` rather than borrowing the number the lobby
+enforces. `build_id` equals `version`: `build_id` exists to tell two nightlies
+apart, and there are none.
+
+The `release` job publishes to a **rolling release at the fixed tag
+`launcher-latest`**, not one release per version. Every URL it serves is baked
+into something that cannot be re-pointed afterwards — `manifest_url_launcher`
+is compiled into every launcher already installed, and the website's download
+links are published. A per-version tag would move those URLs on every cut.
+`/releases/latest/download/` cannot stand in: it resolves to the newest
+non-prerelease across the whole repo, which is a game tag. Version history
+lives in the `launcher-v*` git tags and the CHANGELOG.
+
+`make_latest: false` keeps the launcher off the repo's "Latest" badge and keeps
+`/releases/latest/download/update.json` resolving to the game release. The
+launcher's own RELEASES tab filters `launcher-*` tags out
+(`clients/launcher/src/app.cpp`, `parse_releases`), since that tab lists game
+releases and this one is a non-prerelease.
+
+- `build-macos` gates on its own self-update e2e
   (`infra/scripts/test-launcher-updater.sh`, before signing, on a
   scratch copy) and then runs the same sign → notarize → staple →
   `create-dmg` → sign/notarize/staple-the-DMG sequence as
-  `build-macos`, on the same Apple secrets. It also signs the
-  launcher's nested `Contents/Helpers/updater-stage-2`. arm64 only, on
-  purpose (`clients/launcher/CLAUDE.md` has the reasoning).
-- `build-launcher-windows` uses its **own** vcpkg cache path and key —
+  `release.yml`'s `build-macos`, on the same Apple secrets. It also
+  signs the launcher's nested `Contents/Helpers/updater-stage-2`.
+  arm64 only, on purpose (`clients/launcher/CLAUDE.md` has the
+  reasoning).
+- `build-windows` uses its **own** vcpkg cache path and key —
   `clients/launcher/vcpkg.json` is a different dependency set from the
   game's, so sharing `build-silencer-windows`'s cache would thrash it.
   Produces a portable zip and an Inno Setup installer.
-- `build-launcher-linux` bundles SDL3 with `patchelf --set-rpath
+- `build-linux` bundles SDL3 with `patchelf --set-rpath
   '$ORIGIN'` and tars it.
 
 Each launcher release job has a PR CI counterpart

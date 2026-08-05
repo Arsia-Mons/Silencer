@@ -4,6 +4,29 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+### CI / release
+
+- The launcher now ships on its own tag, independent of the game (#345). Its
+  three build jobs moved out of `release.yml` into a new
+  `release-launcher.yml`, triggered by `launcher-v*` and **not** by any cron.
+  Cutting a launcher release no longer rebuilds and re-notarizes the game, and
+  no longer bumps the wire protocol number the lobby enforces.
+- Fixed the launcher publishing nightlies it was never designed to have. Its
+  jobs gated only on `release.yml`'s `skip` output, so the nightly cron built
+  them and uploaded them to the `latest` prerelease — the opposite of the
+  "one track" contract stated in the workflow and in
+  `clients/launcher/CLAUDE.md`.
+- Fixed the launcher's self-update manifest 404. The shipped default pointed at
+  `/releases/latest/download/update-launcher.json`, which GitHub resolves to
+  the newest non-prerelease across the whole repo — a game tag, which carries
+  no launcher manifest. It now points at the launcher's own rolling
+  `launcher-latest` release.
+- The launcher carries its own version counter, from
+  `${GITHUB_REF_NAME#launcher-v}`, instead of stamping the game's protocol
+  number into `CFBundleShortVersionString` and the Windows VERSIONINFO quad.
+- The launcher's RELEASES tab filters out `launcher-*` tags, which would
+  otherwise appear in its game stable list.
+
 ## [v00062] — 2026-07-13
 
 ### Admin dashboard
