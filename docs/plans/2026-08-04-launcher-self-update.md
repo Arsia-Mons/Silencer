@@ -1,7 +1,15 @@
 # Launcher self-update: Sparkle vs. reusing `clients/silencer/src/updater/`
 
-Status: **built** (Option B, issue #343). This document stays as the
-decision record. One prediction did not survive contact with the code
+Status: **superseded by the bootstrap stub** (issue #347,
+`clients/launcher-stub/`). The in-app mechanism this document chose is
+being replaced: the launcher's own update path must be independent code
+that still works when the launcher itself is broken, so a tiny stub now
+owns the whole loop and the launcher becomes a versioned payload. The
+game-side updater analysis below still stands — stage-2 remains correct
+for the *game*, whose repair path is the launcher.
+
+Previous status: **built** (Option B, issue #343). This document stays as
+the decision record. One prediction did not survive contact with the code
 and is corrected below: `updaterstage2.cpp` IS reused verbatim.
 
 The launcher installs and updates the *game*. Nothing updates the
