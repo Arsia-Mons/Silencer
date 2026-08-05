@@ -98,7 +98,7 @@ write_manifest() {
     s=${shaov:-$(sha "$file")}
   fi
   local plat=$OS # windows|macos|linux, matching the manifest keys
-  printf '{"build_id": "%s", "%s_url": "%s", "%s_sha256": "%s"}\n' \
+  printf '{"build_id": "%s", "%s_payload_url": "%s", "%s_payload_sha256": "%s"}\n' \
     "$id" "$plat" "$url" "$plat" "$s" > "$WWW/manifest.json"
 }
 

@@ -17,14 +17,6 @@ namespace launcher {
 enum class ManifestStatus { Idle, Loading, UpdateAvailable, UpToDate, Unavailable };
 enum class FetchStatus { Idle, Loading, Loaded, Empty, Failed };
 enum class UpdateStatus { Idle, Downloading, Verifying, Extracting, Done, Failed };
-// The launcher's OWN update, one linear flow: the manifest verdict, then the
-// download/verify progression, then the main-thread stage-2 handoff. Ready
-// means the worker staged a verified zip and the main loop must spawn stage-2
-// (pump_self_update); Spawned means the main loop must exit so stage-2 can
-// swap the bundle.
-enum class SelfUpdateStatus {
-  Unknown, UpToDate, Available, Downloading, Verifying, Ready, Spawned, Failed
-};
 enum class PingStatus { Unknown, Probing, Online, Offline };
 enum class AuthStatus { SignedOut, Connecting, SignedIn, Failed };
 
@@ -92,12 +84,6 @@ struct AppSnapshot {
   float update_progress = 0.0f;
   std::string update_error;
 
-  // Self-update (macOS-only today: the manifest carries no Windows/Linux URL).
-  SelfUpdateStatus self_update = SelfUpdateStatus::Unknown;
-  std::string self_latest; // build_id the manifest offers
-  float self_progress = 0.0f;
-  std::string self_error;
-
   FetchStatus news_status = FetchStatus::Idle;
   std::vector<Announcement> announcements; // already sorted (pinned, newest)
 
@@ -140,15 +126,12 @@ public:
   void play();                                  // launch the active channel's game
   void sign_in(const std::string &username, const std::string &password);
   void sign_out();
-  void self_update(); // download + verify the launcher's own update
-
-  // Main-thread stage-2 spawn, mirroring the game's Updater::PumpStage2. Call
-  // each frame; it acts only when the worker has flipped to Ready.
-  void pump_self_update();
+  // The launcher's own updates are the bootstrap stub's job
+  // (clients/launcher-stub/) — this process only ever updates the GAME.
 
 private:
   struct Command {
-    enum class Kind { Refresh, Install, Uninstall, SignIn, SelfUpdate } kind;
+    enum class Kind { Refresh, Install, Uninstall, SignIn } kind;
     std::string channel;
     std::string username;
     std::string password;
@@ -159,7 +142,6 @@ private:
   void run_install(const std::string &channel);
   void run_uninstall(const std::string &channel);
   void run_sign_in(const std::string &username, const std::string &password);
-  void run_self_update();
   void enqueue(Command cmd);
 
   void refresh_installed_locked();
@@ -207,13 +189,6 @@ private:
   std::atomic<uint64_t> update_bytes_got_{0};
   std::atomic<uint64_t> update_bytes_total_{0};
 
-  SelfUpdateStatus self_update_ = SelfUpdateStatus::Unknown;
-  std::string self_latest_;
-  std::string self_url_, self_sha_;
-  std::string self_zip_; // verified download awaiting the main-thread spawn
-  std::string self_error_;
-  std::atomic<uint64_t> self_bytes_got_{0};
-  std::atomic<uint64_t> self_bytes_total_{0};
   std::atomic<bool> cancel_{false};
   // Set by ~App before joining the worker. curl only unwinds a blocked
   // transfer from its progress callback, so without this the destructor waits
@@ -224,7 +199,6 @@ private:
 
   friend bool app_download_progress(void *ctx, uint64_t got, uint64_t total);
   friend bool app_fetch_progress(void *ctx, uint64_t got, uint64_t total);
-  friend bool app_self_update_progress(void *ctx, uint64_t got, uint64_t total);
 };
 
 } // namespace launcher

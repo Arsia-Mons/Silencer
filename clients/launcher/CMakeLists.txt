@@ -171,22 +171,14 @@ set(SIL_APP_SHELL
   src/client/ui/app_shell/navigation/screen_stack.cpp
   src/client/ui/providers/navigation_provider.cpp)
 
-# Updater primitives (download + sha256 + zip extract), plus stage-2 for the
-# launcher's OWN self-update. NOT updater.cpp — installing the game is plain
-# extract-and-replace, because the game is not running.
-#
-# updaterstage2.cpp is reused verbatim, not forked. Every path it acts on
-# arrives through argv (--zip / --install-dir / --pid / --relaunch) and
-# ResolveInstallDir just strips `/Contents/MacOS`, so nothing in it is specific
-# to the game's bundle. It only needs a helper at the same relative path inside
-# our bundle. (docs/plans/2026-08-04-launcher-self-update.md predicted an
-# adapted copy would be needed; reading it says otherwise, and a copy would be
-# 658 lines of the most brick-prone code in the tree, forked.)
+# Updater primitives (download + sha256 + zip extract) for installing the
+# GAME — plain extract-and-replace, because the game is not running. NOT
+# updater.cpp (the game's state machine), and NOT updaterstage2.cpp: the
+# launcher's OWN updates are the bootstrap stub's job (clients/launcher-stub/).
 set(SIL_UPDATER
   src/updater/updaterdownload.cpp
   src/updater/updatersha256.cpp
-  src/updater/updaterzip.cpp
-  src/updater/updaterstage2.cpp)
+  src/updater/updaterzip.cpp)
 
 set(SIL_SOURCES "")
 foreach(s ${SIL_UI_RUNTIME} ${SIL_UI_BRIDGE} ${SIL_APP_SHELL} ${SIL_UPDATER})
@@ -303,36 +295,17 @@ if(APPLE)
     OUTPUT_NAME "Silencer Launcher"
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/SilencerLauncher-Info.plist"
     MACOSX_BUNDLE_BUNDLE_NAME "Silencer Launcher"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.arsiamons.silencer.launcher"
+    # .payload suffix: the user-visible "Silencer Launcher.app" is the
+    # bootstrap stub's bundle (clients/launcher-stub), which keeps the
+    # historical com.arsiamons.silencer.launcher id. This app is nested
+    # inside it (and inside store version dirs); a duplicate id would make
+    # LaunchServices pick one of the two at random.
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.arsiamons.silencer.launcher.payload"
     MACOSX_BUNDLE_ICON_FILE "icon.icns"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${SILENCER_LAUNCHER_VERSION}"
     MACOSX_BUNDLE_BUNDLE_VERSION "${SILENCER_LAUNCHER_VERSION}"
     MACOSX_BUNDLE_COPYRIGHT "Copyright (c) Arsia Mons. All rights reserved.")
   set(LAUNCHER_RES_DIR "$<TARGET_BUNDLE_CONTENT_DIR:silencer-launcher>/Resources")
-
-  # The nested stage-2 helper, at the exact path the macOS Launch() hardcodes:
-  # Contents/Helpers/updater-stage-2. Mirrors the game's helper target — the
-  # same 4-line main() over the same UpdaterStage2::Run. Shipping it inside the
-  # notarized bundle is the point: synthesizing a temporary .app at runtime
-  # would be assessed by Gatekeeper as newly downloaded code.
-  add_executable(updater-stage-2
-    "${SIL}/tools/updater-stage-2/main.cpp"
-    "${SIL}/src/updater/updaterstage2.cpp"
-    "${SIL}/src/updater/updaterzip.cpp")
-  target_compile_features(updater-stage-2 PRIVATE cxx_std_20)
-  target_include_directories(updater-stage-2 PRIVATE "${SIL}/src/updater")
-  # A literal bundle path, not $<TARGET_BUNDLE_CONTENT_DIR:silencer-launcher>:
-  # that genex would make this target depend on the launcher, which already
-  # depends on this target — a cycle. Same shape as the game's helper copy.
-  set(LAUNCHER_HELPERS_DIR
-      "${CMAKE_CURRENT_BINARY_DIR}/Silencer Launcher.app/Contents/Helpers")
-  add_custom_command(TARGET updater-stage-2 POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${LAUNCHER_HELPERS_DIR}"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "$<TARGET_FILE:updater-stage-2>"
-            "${LAUNCHER_HELPERS_DIR}/updater-stage-2"
-    VERBATIM)
-  add_dependencies(silencer-launcher updater-stage-2)
 else()
   set(LAUNCHER_RES_DIR "$<TARGET_FILE_DIR:silencer-launcher>")
 endif()

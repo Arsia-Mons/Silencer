@@ -36,19 +36,21 @@ because this directory is two levels deep.
   (CI passes the release `build/` as OLD). Linux is intentionally excluded (not
   a shipped self-update platform; its cwd-relative asset paths break an
   in-place self-replace).
-- `test-launcher-updater.sh` (macOS) — the same shape for the **launcher's**
-  self-update, run as a gate in `release.yml`'s `build-launcher-macos`
-  (issue #343). Builds an OLD + NEW launcher (distinct
-  `SILENCER_LAUNCHER_VERSION`), serves `update-launcher.json` + the zip over
-  loopback, launches OLD headlessly (`SDL_VIDEODRIVER=dummy`, shot mode)
-  with `SILENCER_LAUNCHER_TEST_SELF_UPDATE=1`, and asserts the
-  auto-relaunched process prints the NEW build id — the environment,
-  including the captured stderr fd, survives stage-2's exec, so the banner
-  lands in the same log. It waits for its own HTTP server to answer before
-  driving the launcher (the #341/#342 lesson), and the relaunched build
-  stops at "already up to date", so the inherited trigger cannot loop.
-  Reuse prebuilt launchers with `OLD_BUILD_DIR` / `NEW_BUILD_DIR` (CI
-  passes the release `build-launcher/` as OLD).
+- `test-launcher-updater.sh` (macOS) — the **launcher's** self-update gate in
+  `release.yml`'s `build-launcher-macos`, rewritten for the bootstrap stub
+  (issue #347). Runs the composed stub-first bundle headlessly against a
+  loopback `update-launcher.json` (`macos_payload_url` keys) and asserts
+  (1) the stub installs a `99999` payload into its versioned store, flips
+  `current.txt`, and the launched payload prints the NEW build id — the
+  payload inherits the stub's env and stderr, so `SDL_VIDEODRIVER=dummy` +
+  shot mode keep it headless and the banner lands in the same log — and
+  (2) a hostile payload archive (`../` members, no payload app) neither
+  escapes the staging dir nor stops the previously-updated version from
+  launching. It waits for its own HTTP server to answer before driving the
+  stub (the #341/#342 lesson). Reuse prebuilt trees with `OLD_BUILD_DIR`
+  (the composed bundle; CI passes the release `build-launcher/`) /
+  `NEW_BUILD_DIR`. The Windows/Linux release jobs run the stub's own
+  mechanism e2e (`clients/launcher-stub/tests/e2e/run.sh`) instead.
 
 ## Gotchas
 

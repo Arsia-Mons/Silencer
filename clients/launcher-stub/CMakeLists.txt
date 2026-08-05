@@ -26,6 +26,12 @@ else()
   list(APPEND STUB_SOURCES src/platform_posix.cpp src/platform_linux.cpp)
 endif()
 
+# Stamped into the macOS bundle's CFBundle*Version; release.yml passes the
+# git tag with its leading v stripped. The stub compares nothing against this
+# — its idea of "current version" is the store's current.txt, never its own
+# binary — so a stale stub version is cosmetic.
+set(SILENCER_STUB_VERSION "00000" CACHE STRING "Stub version (from the git tag)")
+
 add_executable(silencer-launcher-stub ${STUB_SOURCES})
 
 if(WIN32)
@@ -36,6 +42,28 @@ if(WIN32)
   target_compile_definitions(silencer-launcher-stub PRIVATE _CRT_SECURE_NO_WARNINGS)
 elseif(APPLE)
   target_link_libraries(silencer-launcher-stub PRIVATE "-framework Cocoa")
+  # The stub IS "Silencer Launcher.app" on macOS — the bundle users open and
+  # the Dock shows. The cppx launcher's own .app gets nested by the packaging
+  # step at Contents/Resources/payload/ (the seed the stub launches when the
+  # versioned store is empty). The outer bundle keeps the historical bundle
+  # id, so a migrating old install keeps its LaunchServices identity; the
+  # nested payload app carries a .payload-suffixed id.
+  set(STUB_ICNS "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/icons/icon.icns")
+  if(EXISTS "${STUB_ICNS}")
+    set_source_files_properties("${STUB_ICNS}" PROPERTIES
+      MACOSX_PACKAGE_LOCATION "Resources")
+    target_sources(silencer-launcher-stub PRIVATE "${STUB_ICNS}")
+  endif()
+  set_target_properties(silencer-launcher-stub PROPERTIES
+    MACOSX_BUNDLE TRUE
+    OUTPUT_NAME "Silencer Launcher"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/SilencerLauncherStub-Info.plist"
+    MACOSX_BUNDLE_BUNDLE_NAME "Silencer Launcher"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.arsiamons.silencer.launcher"
+    MACOSX_BUNDLE_ICON_FILE "icon.icns"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${SILENCER_STUB_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${SILENCER_STUB_VERSION}"
+    MACOSX_BUNDLE_COPYRIGHT "Copyright (c) Arsia Mons. All rights reserved.")
 else()
   target_link_libraries(silencer-launcher-stub PRIVATE dl pthread)
 endif()

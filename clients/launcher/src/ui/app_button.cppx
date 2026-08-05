@@ -40,7 +40,6 @@ LayoutStyle variant_layout(ButtonVariant variant) {
             .height = Length::points(24),
             .padding = EdgeSizes{10, 10, 0, 0}};
   case ButtonVariant::Chip:
-  case ButtonVariant::UpdateChip:
     return {.direction = FlexDirection::Row,
             .align_items = AlignItems::Center,
             .justify_content = JustifyContent::Center,
@@ -98,13 +97,6 @@ StyleStatePatch variant_style(const AppButtonProps &props) {
   case ButtonVariant::Chrome:
   case ButtonVariant::Chip:
     return ghost_button(tone_color(props.tone));
-  case ButtonVariant::UpdateChip: {
-    // The Primary paint at chip scale, with the standard outset focus ring
-    // (the inset one exists for the playbar's flush split pair).
-    StyleStatePatch sp = accent_button(11);
-    sp.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccent, 2.0f});
-    return sp;
-  }
   case ButtonVariant::Primary:
     return accent_button();
   case ButtonVariant::Tab:

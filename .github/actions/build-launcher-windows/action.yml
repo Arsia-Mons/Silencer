@@ -79,6 +79,20 @@ runs:
         BUILD_DIR: ${{ inputs.build-dir }}
       run: cmake --build "$env:BUILD_DIR"
 
+    - name: Build bootstrap stub
+      shell: pwsh
+      # The stub (clients/launcher-stub) is what users actually launch; it has
+      # no dependencies, so this is a bare CMake+Ninja build.
+      env:
+        BUILD_DIR: ${{ inputs.build-dir }}
+      run: |
+        cmake -B "$env:BUILD_DIR-stub" -S clients/launcher-stub `
+          -G Ninja `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        cmake --build "$env:BUILD_DIR-stub"
+
     - name: sccache stats
       if: always()
       shell: pwsh
@@ -88,20 +102,27 @@ runs:
       shell: pwsh
       env:
         BUILD_DIR: ${{ inputs.build-dir }}
-      # The exe + the vcpkg DLLs it needs (SDL3, SDL3_ttf and their transitive
-      # deps) + the fonts/ and assets/ trees CMake already staged beside the
-      # exe at POST_BUILD. resolve_resource_dir() (src/main.cpp) probes exactly
-      # those two dir names next to the binary, so the layout here IS the
-      # contract — flatten it and the launcher exits before a window opens.
+      # Stub-first layout (issue #347): the root silencer-launcher.exe is the
+      # BOOTSTRAP STUB — what shortcuts point at — and the cppx launcher is
+      # its seed payload under payload/ (the exe + the vcpkg DLLs + fonts/ +
+      # assets/). resolve_resource_dir() probes fonts/ and assets/ beside the
+      # payload binary, so the payload/ layout IS the contract — flatten it
+      # and the launcher exits before a window opens. The stub's versioned
+      # store lands beside the root exe at first update (versions/).
       run: |
         $stage = "$env:BUILD_DIR/package/silencer-launcher"
-        New-Item -ItemType Directory -Force -Path $stage | Out-Null
-        Copy-Item "$env:BUILD_DIR/silencer-launcher.exe" $stage/
-        Copy-Item "$env:BUILD_DIR/vcpkg_installed/x64-windows/bin/*.dll" $stage/
-        Copy-Item -Recurse "$env:BUILD_DIR/fonts" "$stage/fonts"
-        Copy-Item -Recurse "$env:BUILD_DIR/assets" "$stage/assets"
+        $payload = "$stage/payload"
+        New-Item -ItemType Directory -Force -Path $payload | Out-Null
+        Copy-Item "$env:BUILD_DIR-stub/silencer-launcher-stub.exe" "$stage/silencer-launcher.exe"
+        Copy-Item "$env:BUILD_DIR/silencer-launcher.exe" $payload/
+        Copy-Item "$env:BUILD_DIR/vcpkg_installed/x64-windows/bin/*.dll" $payload/
+        Copy-Item -Recurse "$env:BUILD_DIR/fonts" "$payload/fonts"
+        Copy-Item -Recurse "$env:BUILD_DIR/assets" "$payload/assets"
         Write-Host "--- staged files ---"
         Get-ChildItem -Recurse $stage | Select-Object -First 40 FullName
-        foreach ($p in @("$stage/fonts/silencer-135.otf", "$stage/assets/PALETTE.BIN")) {
-          if (-not (Test-Path $p)) { throw "missing resource sentinel: $p" }
+        foreach ($p in @("$stage/silencer-launcher.exe",
+                         "$payload/silencer-launcher.exe",
+                         "$payload/fonts/silencer-135.otf",
+                         "$payload/assets/PALETTE.BIN")) {
+          if (-not (Test-Path $p)) { throw "missing staging sentinel: $p" }
         }

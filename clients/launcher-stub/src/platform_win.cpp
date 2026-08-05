@@ -293,8 +293,22 @@ bool stub::spawn(const std::string &exe, const std::string &workdir, Child *out)
   cmdbuf.push_back(0);
   STARTUPINFOW si{};
   si.cb = sizeof si;
+  // Forward our stdio when we have any (POSIX-fork parity): the e2e and the
+  // release gate read the payload's "[launcher] build <id>" stderr line
+  // through the stub. Double-clicked (no handles), nothing is forwarded.
+  HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
+  HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+  HANDLE herr = GetStdHandle(STD_ERROR_HANDLE);
+  BOOL inherit = FALSE;
+  if (hout || herr) {
+    si.dwFlags |= STARTF_USESTDHANDLES;
+    si.hStdInput = hin;
+    si.hStdOutput = hout;
+    si.hStdError = herr;
+    inherit = TRUE;
+  }
   PROCESS_INFORMATION pi{};
-  if (!CreateProcessW(wexe.c_str(), cmdbuf.data(), nullptr, nullptr, FALSE, 0,
+  if (!CreateProcessW(wexe.c_str(), cmdbuf.data(), nullptr, nullptr, inherit, 0,
                       nullptr, wdir.empty() ? nullptr : wdir.c_str(), &si, &pi))
     return false;
   CloseHandle(pi.hThread);

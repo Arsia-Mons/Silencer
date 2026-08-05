@@ -63,6 +63,20 @@ runs:
         BUILD_DIR: ${{ inputs.build-dir }}
       run: cmake --build "$BUILD_DIR" -j"$(nproc)"
 
+    - name: Build bootstrap stub
+      shell: bash
+      # The stub (clients/launcher-stub) is what users actually launch; it has
+      # no dependencies, so this is a bare CMake+Ninja build.
+      env:
+        BUILD_DIR: ${{ inputs.build-dir }}
+      run: |
+        cmake -B "$BUILD_DIR-stub" -S clients/launcher-stub \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        cmake --build "$BUILD_DIR-stub" -j"$(nproc)"
+
     - name: sccache stats
       if: always()
       shell: bash
@@ -72,34 +86,45 @@ runs:
       shell: bash
       env:
         BUILD_DIR: ${{ inputs.build-dir }}
-      # Copy each .so dereferenced — the binary's NEEDED entry is the soname,
-      # so a single regular file at that path is what the loader wants. Then
-      # patchelf RPATH=$ORIGIN so the bundled SDL3 loads from the executable's
-      # own dir instead of the build-time install paths, which do not exist on
-      # a user's machine. fonts/ and assets/ come across as-is: those two dir
-      # names beside the binary are what resolve_resource_dir() probes for.
+      # Stub-first layout (issue #347): the root silencer-launcher is the
+      # BOOTSTRAP STUB — what users run — and the cppx launcher is its seed
+      # payload under payload/. Each .so is copied dereferenced — the binary's
+      # NEEDED entry is the soname, so a single regular file at that path is
+      # what the loader wants — and patchelf RPATH=$ORIGIN makes them resolve
+      # from the payload binary's own dir. fonts/ and assets/ beside the
+      # payload binary are what resolve_resource_dir() probes for.
       run: |
         echo "--- SDL3 install roots ---"
         echo "  SDL3_ROOT=$SDL3_ROOT"
         echo "  SDL3_ttf_ROOT=$SDL3_ttf_ROOT"
         stage="$BUILD_DIR/package/silencer-launcher"
-        mkdir -p "$stage"
-        cp "$BUILD_DIR/silencer-launcher" "$stage/"
-        cp -L "$SDL3_ROOT/lib/libSDL3.so.0" "$stage/"
-        cp -L "$SDL3_ttf_ROOT/lib/libSDL3_ttf.so.0" "$stage/"
-        patchelf --set-rpath '$ORIGIN' "$stage/silencer-launcher"
-        cp -r "$BUILD_DIR/fonts" "$stage/fonts"
-        cp -r "$BUILD_DIR/assets" "$stage/assets"
+        payload="$stage/payload"
+        mkdir -p "$payload"
+        cp "$BUILD_DIR-stub/silencer-launcher-stub" "$stage/silencer-launcher"
+        cp "$BUILD_DIR/silencer-launcher" "$payload/"
+        cp -L "$SDL3_ROOT/lib/libSDL3.so.0" "$payload/"
+        cp -L "$SDL3_ttf_ROOT/lib/libSDL3_ttf.so.0" "$payload/"
+        patchelf --set-rpath '$ORIGIN' "$payload/silencer-launcher"
+        cp -r "$BUILD_DIR/fonts" "$payload/fonts"
+        cp -r "$BUILD_DIR/assets" "$payload/assets"
         echo "--- staged files ---"
-        ls -la "$stage"
-        echo "--- ldd output ---"
-        ldd "$stage/silencer-launcher"
-        if ldd "$stage/silencer-launcher" | grep -F "not found"; then
+        ls -la "$stage" "$payload"
+        echo "--- ldd output (payload) ---"
+        ldd "$payload/silencer-launcher"
+        if ldd "$payload/silencer-launcher" | grep -F "not found"; then
           echo "ERROR: missing dynamic library dependencies"
           exit 1
         fi
-        # The two sentinels resolve_resource_dir() probes. Missing fonts are
-        # fatal at startup, so fail the build here instead of shipping it.
-        for f in "$stage/fonts/silencer-135.otf" "$stage/assets/PALETTE.BIN"; do
+        # The stub must depend on nothing beyond libc/libstdc++ — that is its
+        # whole safety property. libcurl is dlopen'd, so it must NOT appear.
+        echo "--- ldd output (stub) ---"
+        ldd "$stage/silencer-launcher"
+        if ldd "$stage/silencer-launcher" | grep -E "not found|libcurl|libSDL"; then
+          echo "ERROR: stub has unexpected dynamic dependencies"
+          exit 1
+        fi
+        # Missing fonts are fatal at payload startup, so fail the build here
+        # instead of shipping it.
+        for f in "$payload/fonts/silencer-135.otf" "$payload/assets/PALETTE.BIN"; do
           [ -f "$f" ] || { echo "ERROR: missing resource sentinel: $f"; exit 1; }
         done

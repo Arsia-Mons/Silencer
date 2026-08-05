@@ -29,11 +29,18 @@ deliberate.
   launcher's own default `base_dir` for **game** installs
   (`src/config.cpp`). Installing the launcher there drops it on top of
   the per-channel dirs it manages.
-- **`fonts\` and `assets\` must ship and must stay beside the exe.**
-  `resolve_resource_dir()` (`src/main.cpp`) probes those two dir names
-  next to the binary for `silencer-135.otf` and `PALETTE.BIN`. Missing
-  fonts are fatal — the launcher exits before a window opens, so a
-  dropped `[Files]` line reads as "the installer works, the app is
+- **The root exe is the bootstrap stub** (issue #347, stub-first
+  layout): shortcuts point at `{app}\silencer-launcher.exe` = the stub;
+  the cppx launcher + its DLLs + resources live under `{app}\payload\`,
+  and the stub's versioned store grows at `{app}\versions\`.
+  `[InstallDelete]` clears the pre-stub root DLLs/fonts/assets on
+  upgrade, and resets `versions\` — a manual (re)install makes the
+  installed seed the current version.
+- **`fonts\` and `assets\` must ship and must stay beside the payload
+  exe.** `resolve_resource_dir()` (`src/main.cpp`) probes those two dir
+  names next to the binary for `silencer-135.otf` and `PALETTE.BIN`.
+  Missing fonts are fatal — the launcher exits before a window opens,
+  so a dropped `[Files]` line reads as "the installer works, the app is
   broken". The CI action asserts both sentinels before ISCC runs.
 - **`[UninstallDelete]` wipes `{app}`.** Safe, and checked: the config
   is at `%APPDATA%\Silencer Launcher\` and installed games are under

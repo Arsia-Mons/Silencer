@@ -268,9 +268,15 @@ Fresh try_update(stub::GuiState &st, const Store &store, const std::string &cur)
     stub::logf("manifest fetch failed: %s", r.error.c_str());
     return fresh;
   }
+  // *_payload_* keys, not the plain <plat>_url ones: those carry the FULL
+  // bundle for old in-the-wild launchers whose stage-2 swap migrates them to
+  // this architecture. Feeding a full stub-first bundle to the stub would
+  // install a stub as its own payload (and then launch itself forever).
   const std::string build_id = stub::json_str_field(body, "build_id");
-  const std::string dl_url = stub::json_str_field(body, std::string(kPlat) + "_url");
-  const std::string sha = stub::json_str_field(body, std::string(kPlat) + "_sha256");
+  const std::string dl_url =
+      stub::json_str_field(body, std::string(kPlat) + "_payload_url");
+  const std::string sha =
+      stub::json_str_field(body, std::string(kPlat) + "_payload_sha256");
   if (!build_id.empty() && build_id == cur) {
     stub::logf("up to date (%s)", cur.c_str());
     return fresh;

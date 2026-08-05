@@ -3,7 +3,6 @@
 #include "ui.h"
 
 #include "client/ui/app_shell/ui_pipeline.h"
-#include "updater/updaterstage2.h"
 #include "render/cppx_ui/pipeline_host.h"
 #include "render/cppx_ui/sdl_ui_input.h"
 #include "ui/input.h"
@@ -260,23 +259,10 @@ void handle_key(SDL_Keycode key, ::ui::UiInputFrame &in, bool typing) {
 
 } // namespace
 
-int main(int argc, char **argv) {
-  // Stage-2 self-replace. This same binary is re-executed by the nested helper
-  // in Contents/Helpers to swap the bundle out from under the launcher that
-  // spawned it, so the check must come before SDL touches anything — stage-2
-  // opens no window and must not init a video driver it will never use.
-  for (int i = 1; i < argc; ++i) {
-    if (std::string(argv[i]) == "--self-update-stage2")
-      return UpdaterStage2::Run(argc, argv);
-  }
-
-  // Clear leftovers from a previous self-update (`<install>.old`, and on
-  // Windows the sidelined `<file>.old-<ticks>` copies stage-2 leaves when a
-  // target was locked). Safe when no update ever ran.
-  UpdaterStage2::CleanupPreviousUpdate();
-
+int main(int, char **) {
   // The build's identity, on stderr where a log capture keeps it. The
-  // self-update e2e asserts this line from the auto-relaunched process.
+  // stub-based self-update e2e asserts this line from the payload the stub
+  // launched.
   fprintf(stderr, "[launcher] build %s\n", SILENCER_LAUNCHER_BUILD_ID);
 
   if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -307,9 +293,7 @@ int main(int argc, char **argv) {
   // until the async manifest/news states settle, dump the frame to a PNG, quit.
   const char *shot_path = getenv("SILENCER_LAUNCHER_SHOT");
   int frame_no = 0;
-  // The failsafe frame cap. A self-update run does real work (download,
-  // codesign verify) that a slow CI runner can stretch past the normal ~6s.
-  const int shot_frame_cap = getenv("SILENCER_LAUNCHER_TEST_SELF_UPDATE") ? 3600 : 360;
+  const int shot_frame_cap = 360; // the failsafe frame cap (~6s)
 
   react_init_runtime();
 
@@ -328,11 +312,6 @@ int main(int argc, char **argv) {
     }
     if (const char *ti = getenv("SILENCER_LAUNCHER_TEST_INSTALL"))
       app.install(ti);
-    // Runs the real self-update flow on startup: manifest compare -> download
-    // -> verify -> stage-2 swap -> auto-relaunch. The worker serializes it
-    // after the initial refresh, so the manifest result is in by then.
-    if (getenv("SILENCER_LAUNCHER_TEST_SELF_UPDATE"))
-      app.self_update();
   }
 
   launcher::Intents intents;
@@ -349,7 +328,6 @@ int main(int argc, char **argv) {
   intents.play = [&app]() { app.play(); };
   intents.sign_in = [&app](const std::string &u, const std::string &p) { app.sign_in(u, p); };
   intents.sign_out = [&app]() { app.sign_out(); };
-  intents.self_update = [&app]() { app.self_update(); };
   intents.open_url = [](const std::string &url) { SDL_OpenURL(url.c_str()); };
 
   launcher::AppSnapshot snap;
@@ -520,17 +498,6 @@ int main(int argc, char **argv) {
     const bool snap_changed = !(next_snap == snap);
     snap = std::move(next_snap);
 
-    // Self-update handoff. The stage-2 spawn happens here on the main thread
-    // (mirroring the game's PumpStage2); once spawned, exit so stage-2 can
-    // swap the bundle out from under us and relaunch the new build.
-    if (snap.self_update == launcher::SelfUpdateStatus::Ready)
-      app.pump_self_update();
-    if (snap.self_update == launcher::SelfUpdateStatus::Spawned) {
-      fprintf(stderr, "[launcher] self-update staged; exiting for stage-2\n");
-      running = false;
-      break;
-    }
-
     // Every async source the shot (and its input script) waits out.
     auto manifest_settled = [](launcher::ManifestStatus m) {
       return m != launcher::ManifestStatus::Idle && m != launcher::ManifestStatus::Loading;
@@ -546,9 +513,7 @@ int main(int argc, char **argv) {
         snap.auth != launcher::AuthStatus::Connecting &&
         snap.update_status != launcher::UpdateStatus::Downloading &&
         snap.update_status != launcher::UpdateStatus::Verifying &&
-        snap.update_status != launcher::UpdateStatus::Extracting &&
-        snap.self_update != launcher::SelfUpdateStatus::Downloading &&
-        snap.self_update != launcher::SelfUpdateStatus::Verifying;
+        snap.update_status != launcher::UpdateStatus::Extracting;
 
     // Replay the shot script one step at a time once the app is quiet.
     if (shot_path && async_settled) {

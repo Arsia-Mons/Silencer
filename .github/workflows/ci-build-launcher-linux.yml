@@ -28,6 +28,7 @@ jobs:
           filters: |
             relevant:
               - 'clients/launcher/**'
+              - 'clients/launcher-stub/**'
               - 'clients/lobby-sdk/cpp/**'
               - 'clients/silencer/src/ui/**'
               - 'clients/silencer/src/render/cppx_ui/**'
@@ -48,7 +49,9 @@ jobs:
 
       - name: Verify bundled dependencies
         if: steps.changes.outputs.relevant == 'true'
-        run: tests/e2e/check-bundle-linux.sh build-launcher/package/silencer-launcher silencer-launcher
+        # The payload subdir is where the .so-carrying launcher lives (stub-first
+        # layout, #347); the action itself asserts the root stub's ldd is bare.
+        run: tests/e2e/check-bundle-linux.sh build-launcher/package/silencer-launcher/payload silencer-launcher
 
       - if: steps.changes.outputs.relevant != 'true'
         run: echo "No launcher/reused-source/asset changes; skipping launcher Linux build."

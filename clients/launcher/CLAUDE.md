@@ -184,10 +184,8 @@ path — a change there can break the launcher while every game check stays
 green, and nothing else catches it. Not required checks yet.
 
 Those three `check-bundle-*` scripts are the game's, given a defaulted
-exe-name argument. On macOS the defaulted helper path also applies: the
-launcher ships the same nested `Contents/Helpers/updater-stage-2`, so the
-check asserts it exists and stays dependency-free. A one-argument call still
-behaves exactly as before.
+exe-name argument. (The launcher no longer ships a stage-2 helper — its
+self-update belongs to the bootstrap stub, see below.)
 
 ## Distribution
 
@@ -195,32 +193,42 @@ Three release jobs in `release.yml`, one per platform, each on a `v*` tag
 alongside its game counterpart. All three build into `build-launcher/`, never
 `build/`, so a launcher job and a game job never collide.
 
+**Every shipped artifact is stub-first** (issue #347): what the user opens is
+the bootstrap stub (`clients/launcher-stub/`), and this cppx launcher is the
+seed payload nested inside — `payload/` beside the stub exe on
+Windows/Linux, `Contents/Resources/payload/Silencer Launcher.app` inside the
+stub's bundle on macOS. Each job also publishes a
+`silencer-launcher-payload-*` archive (a stub version dir's contents) that
+`update-launcher.json`'s `<plat>_payload_url` keys point at.
+
 | Job | Composite action | Artifacts |
 |---|---|---|
-| `build-launcher-macos` | `build-launcher-macos` | `silencer-launcher-macos-arm64.dmg` |
-| `build-launcher-windows` | `build-launcher-windows` | `silencer-launcher-windows-x64.zip`, `silencer-launcher-windows-x64-setup-*.exe` |
-| `build-launcher-linux` | `build-launcher-linux` | `silencer-launcher-linux-x64.tar.gz` |
+| `build-launcher-macos` | `build-launcher-macos` | `silencer-launcher-macos-arm64.dmg`, `silencer-launcher-macos-arm64.zip` (full bundle), `silencer-launcher-payload-macos-arm64.zip` |
+| `build-launcher-windows` | `build-launcher-windows` | `silencer-launcher-windows-x64.zip`, `silencer-launcher-windows-x64-setup-*.exe`, `silencer-launcher-payload-windows-x64.zip` |
+| `build-launcher-linux` | `build-launcher-linux` | `silencer-launcher-linux-x64.tar.gz`, `silencer-launcher-payload-linux-x64.tar.gz` |
 
 Only macOS is signed. Windows and Linux ship unsigned, same as the game's, and
 the release notes tell users what SmartScreen will say.
 
-**The Windows and Linux staging layout is the runtime contract, not packaging
-taste.** `resolve_resource_dir()` probes `fonts/` and `assets/` *beside the
+**The staging layout is the runtime contract, not packaging taste.**
+`resolve_resource_dir()` probes `fonts/` and `assets/` *beside the payload
 binary* for the sentinels `silencer-135.otf` and `PALETTE.BIN`. Flatten those
 dirs and the launcher exits before a window opens (missing fonts are fatal —
-see Gotchas). Both composite actions assert the two sentinels before packaging,
+see Gotchas). Both composite actions assert the sentinels before packaging,
 so this fails in CI rather than in a user's hands.
 
 ### macOS
 
 `release.yml`'s **`build-launcher-macos`** job is the whole pipeline:
 
-`.github/actions/build-launcher-macos` (configure + build + `package-macos.sh`)
-→ import the Developer ID cert → codesign inside-out with
-`--options runtime --timestamp` → `notarytool submit --wait` → `stapler staple`
-+ `validate` → `spctl -a -vv -t execute` → `create-dmg` with an
-`/Applications` symlink → sign, notarize and staple **the DMG itself** →
-upload `silencer-launcher-macos-arm64.dmg`.
+`.github/actions/build-launcher-macos` (configure + build +
+`package-macos.sh`, then build the stub's own bundle and nest this app
+inside it as the seed payload) → the stub-based self-update e2e gate →
+import the Developer ID cert → codesign inside-out (payload dylibs →
+payload app → stub) with `--options runtime --timestamp` → `notarytool
+submit --wait` → `stapler staple` + `validate` → `spctl -a -vv -t execute` →
+`create-dmg` with an `/Applications` symlink → sign, notarize and staple
+**the DMG itself** → upload `silencer-launcher-macos-arm64.dmg`.
 
 The CI action calls the same `package-macos.sh` a developer runs, so the two
 cannot drift. It reuses `release.yml`'s existing Apple secrets
@@ -248,9 +256,10 @@ universal only when the game does.
 
 `.github/actions/build-launcher-windows` configures against vcpkg (its **own**
 binary cache, keyed on `clients/launcher/vcpkg.json` — the launcher's
-dependency set is not the game's, and sharing a cache thrashes it), builds,
-then stages the exe + the vcpkg DLLs + `fonts/` + `assets/`. The release job
-zips that, then runs ISCC over
+dependency set is not the game's, and sharing a cache thrashes it), builds
+this launcher and the stub, then stages the stub as the root
+`silencer-launcher.exe` with the launcher exe + vcpkg DLLs + `fonts/` +
+`assets/` under `payload\`. The release job zips that, then runs ISCC over
 [`installer/silencer-launcher.iss`](installer/CLAUDE.md).
 
 `resources.rc` gives the exe its icon and a **VERSIONINFO** block, so
@@ -264,45 +273,33 @@ relying on the platform module to imply it.
 
 ### Linux
 
-`.github/actions/build-launcher-linux` builds, copies `libSDL3.so.0` and
-`libSDL3_ttf.so.0` **dereferenced** (`cp -L` — the binary's NEEDED entry is the
-soname, so the loader wants a regular file at that path), `patchelf --set-rpath
-'$ORIGIN'` so they resolve from the executable's own dir, then copies `fonts/`
-and `assets/`. It fails the build if `ldd` reports anything "not found". The
-release job tars it. There is no `.desktop` file or icon install — the tarball
-is a run-from-anywhere bundle, not a distro package.
+`.github/actions/build-launcher-linux` builds this launcher and the stub,
+stages the stub at the tarball root, and under `payload/` copies the launcher
+plus `libSDL3.so.0` and `libSDL3_ttf.so.0` **dereferenced** (`cp -L` — the
+binary's NEEDED entry is the soname, so the loader wants a regular file at
+that path), `patchelf --set-rpath '$ORIGIN'` so they resolve from the payload
+binary's own dir, then `fonts/` and `assets/`. It fails the build if `ldd`
+reports anything "not found" (and if the stub's own `ldd` shows anything
+beyond system libs). The release job tars it. There is no `.desktop` file or
+icon install — the tarball is a run-from-anywhere bundle, not a distro
+package.
 
 ### Self-update
 
-The launcher updates itself, macOS-only (the manifest carries no
-Windows/Linux URL on purpose — those stage-2 branches compile but nothing has
-exercised them). The mechanism decision is
-[`../../docs/plans/2026-08-04-launcher-self-update.md`](../../docs/plans/2026-08-04-launcher-self-update.md).
-The flow, all in `src/app.cpp` + `main.cpp`:
+**This process never updates itself.** The launcher's own updates belong
+to the bootstrap stub (`clients/launcher-stub/`, issue #347): the user
+launches the stub, the stub checks `manifest_url_launcher` (the
+`<plat>_payload_url` keys), applies updates into a versioned store, and
+runs this launcher as the *payload*. Any failure launches the existing
+version; a payload that dies right after an update is rolled back. This
+binary keeps exactly one self-update duty: printing
+`[launcher] build <id>` on stderr at startup, which the stub's release
+gate asserts from the payload it relaunched.
 
-1. `run_refresh` fetches `manifest_url_launcher` and compares the manifest's
-   `build_id` (never `version` — two nightlies share the protocol number)
-   against the compiled-in `SILENCER_LAUNCHER_BUILD_ID`.
-2. A mismatch with a `macos_url` shows the topbar's `UpdateChip` AppButton.
-   Click → `App::self_update()`: download, sha256 verify, then the Developer
-   ID check — the payload-signing property Sparkle would have given. The
-   requirement's team ID comes from the running bundle's own signature, so a
-   signed release enforces it automatically and an unsigned build (dev, e2e)
-   skips it.
-3. The worker flips to `Ready`; the main loop calls `App::pump_self_update()`
-   (the stage-2 fork happens on the main thread, mirroring the game's
-   `PumpStage2`), then exits on `Spawned` so stage-2 can swap the bundle and
-   relaunch it.
-
-Stage-2 itself is the game's `updaterstage2.cpp`, reused verbatim — every
-path arrives through argv, nothing in it is game-specific. The launcher only
-adds its own `Contents/Helpers/updater-stage-2` helper target (the exact path
-macOS `Launch()` hardcodes; never synthesize a temp `.app` at runtime —
-Gatekeeper assesses that as newly downloaded code). `release.yml` signs and
-notarizes the helper like the game's, and gates the launcher release on
-`infra/scripts/test-launcher-updater.sh` — a headless e2e where the just-built
-launcher self-updates to a `99999` build and the auto-relaunched process
-must report the new build id.
+(The previous in-app mechanism — `SelfUpdateChip`, `App::self_update`,
+the nested stage-2 helper — was removed with #347. The decision record
+for the old design is `docs/plans/2026-08-04-launcher-self-update.md`,
+kept as history.)
 
 ## Run
 
@@ -347,10 +344,6 @@ Env overrides (all optional):
   `go run ./services/lobby -addr :15170 ...`).
 - `SILENCER_LAUNCHER_TEST_INSTALL=<channel>` — shot-mode only: run the real
   download→verify→extract flow on startup.
-- `SILENCER_LAUNCHER_TEST_SELF_UPDATE=1` — shot-mode only: run the real
-  self-update flow on startup (manifest compare → download → verify →
-  stage-2 swap → auto-relaunch). Safe on the relaunched build: its build id
-  matches the manifest, so the flow stops at "already up to date".
 - `SILENCER_LAUNCHER_PERF_SCALE=<f>` + `SILENCER_LAUNCHER_PERF_FRAMES=<n>` —
   frame-cost measurement: raster at `f`× the logical size (synthetic HiDPI),
   inject a focus-nav repaint every 30 frames, quit after `n` measured frames,
@@ -487,10 +480,11 @@ field falls back to its default instead of aborting the parse.
   the content panel's column it overflows and pushes the playbar off the
   window — `settings_content` wraps it in a `cols` box for that reason alone.
 - **Updater reuse**: `updaterdownload` + `updatersha256` + `updaterzip` for
-  installing the game (plain extract-and-replace — the game isn't running),
-  plus `updaterstage2` for the launcher's OWN self-update (see Distribution).
-  **Not** `updater.cpp` (the game's state machine). On macOS `updaterzip`
-  shells out to `ditto`, so no minizip dependency.
+  installing the game (plain extract-and-replace — the game isn't running).
+  **Not** `updater.cpp` (the game's state machine), and **not**
+  `updaterstage2` — the launcher's OWN updates are the bootstrap stub's job
+  (see Self-update). On macOS `updaterzip` shells out to `ditto`, so no
+  minizip dependency.
 
 ## Verify
 

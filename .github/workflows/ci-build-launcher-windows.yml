@@ -28,6 +28,7 @@ jobs:
           filters: |
             relevant:
               - 'clients/launcher/**'
+              - 'clients/launcher-stub/**'
               - 'clients/lobby-sdk/cpp/**'
               - 'clients/silencer/src/ui/**'
               - 'clients/silencer/src/render/cppx_ui/**'
@@ -50,7 +51,9 @@ jobs:
       - name: Verify bundled dependencies
         if: steps.changes.outputs.relevant == 'true'
         shell: pwsh
-        run: pwsh tests/e2e/check-bundle-windows.ps1 -PackageDir build-launcher/package/silencer-launcher -ExeName silencer-launcher.exe
+        # The payload subdir is where the DLL-carrying launcher lives (stub-first
+        # layout, #347); the root stub is dependency-free by design.
+        run: pwsh tests/e2e/check-bundle-windows.ps1 -PackageDir build-launcher/package/silencer-launcher/payload -ExeName silencer-launcher.exe
 
       - if: steps.changes.outputs.relevant != 'true'
         shell: bash

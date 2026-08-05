@@ -71,10 +71,50 @@ runs:
       # dylibbundler search paths.
       run: bash clients/launcher/package-macos.sh "$BUILD_DIR/Silencer Launcher.app"
 
+    - name: Build bootstrap stub
+      shell: bash
+      # The stub (clients/launcher-stub) is what users actually open; it has
+      # no dependencies, so this is a bare CMake build producing its own
+      # "Silencer Launcher.app" bundle.
+      env:
+        LAUNCHER_VERSION_INPUT: ${{ inputs.launcher-version }}
+        BUILD_DIR: ${{ inputs.build-dir }}
+      run: |
+        cmake -B "$BUILD_DIR-stub" -S clients/launcher-stub \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+          -DSILENCER_STUB_VERSION="$LAUNCHER_VERSION_INPUT"
+        cmake --build "$BUILD_DIR-stub" -j"$(sysctl -n hw.ncpu)"
+
+    - name: Compose stub-first bundle
+      shell: bash
+      env:
+        BUILD_DIR: ${{ inputs.build-dir }}
+      # Stub-first layout (issue #347): the shipped "Silencer Launcher.app"
+      # IS the stub's bundle; the self-contained cppx launcher app is nested
+      # at Contents/Resources/payload/ as the seed the stub launches when its
+      # versioned store (Application Support) is empty. The payload app also
+      # survives at $BUILD_DIR/payload-stage/ — release.yml zips THAT as the
+      # self-update payload archive.
+      run: |
+        mkdir -p "$BUILD_DIR/payload-stage"
+        mv "$BUILD_DIR/Silencer Launcher.app" "$BUILD_DIR/payload-stage/Silencer Launcher.app"
+        ditto "$BUILD_DIR-stub/Silencer Launcher.app" "$BUILD_DIR/Silencer Launcher.app"
+        mkdir -p "$BUILD_DIR/Silencer Launcher.app/Contents/Resources/payload"
+        ditto "$BUILD_DIR/payload-stage/Silencer Launcher.app" \
+              "$BUILD_DIR/Silencer Launcher.app/Contents/Resources/payload/Silencer Launcher.app"
+        for p in "$BUILD_DIR/Silencer Launcher.app/Contents/MacOS/Silencer Launcher" \
+                 "$BUILD_DIR/Silencer Launcher.app/Contents/Resources/payload/Silencer Launcher.app/Contents/MacOS/Silencer Launcher"; do
+          [ -x "$p" ] || { echo "ERROR: missing composed sentinel: $p"; exit 1; }
+        done
+
     - name: Show bundle
       shell: bash
       env:
         BUILD_DIR: ${{ inputs.build-dir }}
       run: |
         plutil -p "$BUILD_DIR/Silencer Launcher.app/Contents/Info.plist"
-        ls -R "$BUILD_DIR/Silencer Launcher.app/Contents/Resources" | head -40
+        ls "$BUILD_DIR/Silencer Launcher.app/Contents/Resources"
+        ls -R "$BUILD_DIR/Silencer Launcher.app/Contents/Resources/payload/Silencer Launcher.app/Contents/Resources" | head -40

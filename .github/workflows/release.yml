@@ -283,11 +283,12 @@ jobs:
           launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
           build-dir: build-launcher
 
-      - name: Launcher self-update e2e (headless)
-        # OLD = the just-built (still unsigned) release bundle; NEW = a second
-        # build versioned 99999 (sccache-warm off the release objects). Runs on
-        # a scratch copy of the bundle, so the shipped artifact stays pristine.
-        # Unsigned OLD means the Developer ID payload check exercises its skip
+      - name: Launcher self-update e2e (headless, stub-based)
+        # The just-built stub-first bundle self-updates to a second launcher
+        # payload versioned 99999, plus a hostile-archive case (a zip with
+        # ../ members must not escape nor break the install). Runs on a
+        # scratch copy, so the shipped artifact stays pristine. Unsigned OLD
+        # means the stub's Developer ID payload check exercises its skip
         # path here; the enforce path needs a signed running build.
         env:
           OLD_BUILD_DIR: ${{ github.workspace }}/build-launcher
@@ -327,16 +328,27 @@ jobs:
           #
           # "Silencer Launcher.app" has a space: every path below is quoted,
           # and the find pipe uses -print0/-0 for the same reason.
-          find "Silencer Launcher.app/Contents/Frameworks" -name "*.dylib" -print0 \
+          #
+          # Stub-first layout (#347): the outer bundle is the bootstrap stub;
+          # the cppx launcher app is nested at Contents/Resources/payload/.
+          # Inside-out means: payload dylibs -> payload binary -> payload
+          # .app -> stub binary -> outer .app. The stub's Developer ID check
+          # verifies downloaded payload apps against this same team id at
+          # update time.
+          PAYLOAD="Silencer Launcher.app/Contents/Resources/payload/Silencer Launcher.app"
+          find "$PAYLOAD/Contents/Frameworks" -name "*.dylib" -print0 \
             | xargs -0 -n1 codesign --force --timestamp --options runtime \
               --sign "$IDENTITY"
           codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" "Silencer Launcher.app/Contents/Helpers/updater-stage-2"
+            --sign "$IDENTITY" "$PAYLOAD/Contents/MacOS/Silencer Launcher"
+          codesign --force --timestamp --options runtime \
+            --sign "$IDENTITY" "$PAYLOAD"
           codesign --force --timestamp --options runtime \
             --sign "$IDENTITY" "Silencer Launcher.app/Contents/MacOS/Silencer Launcher"
           codesign --force --timestamp --options runtime \
             --sign "$IDENTITY" "Silencer Launcher.app"
           codesign --verify --deep --strict --verbose=2 "Silencer Launcher.app"
+          codesign --verify --strict --verbose=2 "$PAYLOAD"
 
       - name: Notarize and staple
         working-directory: build-launcher
@@ -356,20 +368,34 @@ jobs:
           xcrun stapler validate "Silencer Launcher.app"
           spctl -a -vv -t execute "Silencer Launcher.app"
 
-      - name: Zip the stapled bundle for self-update
+      - name: Zip the stapled bundle + the self-update payload
         working-directory: build-launcher
-        # Self-update consumes a zip, not the DMG — the same shape the game's
-        # updater takes, so updaterzip.cpp extracts it with ditto unchanged.
-        # Zipped AFTER stapling, so a self-updated launcher carries its own
-        # notarization ticket and launches offline exactly like a DMG install.
+        # Two zips, two consumers (#347):
+        # - silencer-launcher-macos-arm64.zip = the FULL stub-first bundle.
+        #   Old in-the-wild launchers read macos_url and stage-2-swap their
+        #   whole bundle with it — that swap IS their migration to the stub
+        #   architecture. Zipped AFTER stapling so it carries the ticket.
+        # - silencer-launcher-payload-macos-arm64.zip = just the nested
+        #   payload app, the shape a stub version dir holds. The stub reads
+        #   macos_payload_url; feeding it the full bundle would nest a stub
+        #   inside a stub.
         run: |
           ditto -ck --keepParent --sequesterRsrc \
             "Silencer Launcher.app" silencer-launcher-macos-arm64.zip
+          ditto -ck --keepParent --sequesterRsrc \
+            "Silencer Launcher.app/Contents/Resources/payload/Silencer Launcher.app" \
+            silencer-launcher-payload-macos-arm64.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: launcher-macos-arm64-zip
           path: build-launcher/silencer-launcher-macos-arm64.zip
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-macos-payload-zip
+          path: build-launcher/silencer-launcher-payload-macos-arm64.zip
           if-no-files-found: error
 
       - name: Build, sign, notarize, staple DMG
@@ -436,14 +462,35 @@ jobs:
           launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
           build-dir: build-launcher
 
-      - name: Zip portable bundle
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Stub self-update e2e (headless)
+        # The stub mechanism e2e (update / fallback / rollback / bootstrap)
+        # against the just-built stub binary — the same fail-safe gate the
+        # macOS job gets via test-launcher-updater.sh.
+        shell: bash
+        run: bash clients/launcher-stub/tests/e2e/run.sh "$(pwd)/build-launcher-stub"
+
+      - name: Zip portable bundle + the self-update payload
         shell: pwsh
-        run: Compress-Archive -Path "build-launcher/package/silencer-launcher" -DestinationPath build-launcher/silencer-launcher-windows-x64.zip -Force
+        # The payload zip's root is a stub version dir's contents — what
+        # windows_payload_url serves to the stub (#347).
+        run: |
+          Compress-Archive -Path "build-launcher/package/silencer-launcher" -DestinationPath build-launcher/silencer-launcher-windows-x64.zip -Force
+          Compress-Archive -Path "build-launcher/package/silencer-launcher/payload/*" -DestinationPath build-launcher/silencer-launcher-payload-windows-x64.zip -Force
 
       - uses: actions/upload-artifact@v4
         with:
           name: launcher-windows-x64
           path: build-launcher/silencer-launcher-windows-x64.zip
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-windows-payload-zip
+          path: build-launcher/silencer-launcher-payload-windows-x64.zip
           if-no-files-found: error
 
       - name: Install Inno Setup
@@ -487,13 +534,33 @@ jobs:
           launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
           build-dir: build-launcher
 
-      - name: Package
-        run: tar czf build-launcher/silencer-launcher-linux-x64.tar.gz -C build-launcher/package silencer-launcher
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Stub self-update e2e (headless)
+        # The stub mechanism e2e (update / fallback / rollback / bootstrap)
+        # against the just-built stub binary.
+        run: bash clients/launcher-stub/tests/e2e/run.sh "$(pwd)/build-launcher-stub"
+
+      - name: Package tarball + the self-update payload
+        # The payload tarball's root is a stub version dir's contents — what
+        # linux_payload_url serves to the stub (#347). tar.gz, not zip: GNU
+        # tar (the extractor the stub shells out to) cannot read zip.
+        run: |
+          tar czf build-launcher/silencer-launcher-linux-x64.tar.gz -C build-launcher/package silencer-launcher
+          tar czf build-launcher/silencer-launcher-payload-linux-x64.tar.gz -C build-launcher/package/silencer-launcher/payload .
 
       - uses: actions/upload-artifact@v4
         with:
           name: launcher-linux-x64
           path: build-launcher/silencer-launcher-linux-x64.tar.gz
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-payload-tgz
+          path: build-launcher/silencer-launcher-payload-linux-x64.tar.gz
           if-no-files-found: error
 
   build-windows:
@@ -653,28 +720,48 @@ jobs:
           cat update.json
 
       - name: Build launcher update manifest
-        # The launcher's own manifest, served at /api/launcher/manifest/self
-        # and consumed by its self-updater. Separate from update.json because
-        # it describes a different payload: the launcher ships on one track,
-        # so this follows stable releases only.
+        # The launcher's own manifest, served at /api/launcher/manifest/self.
+        # Separate from update.json because it describes a different payload:
+        # the launcher ships on one track, so this follows stable releases
+        # only. Two families of keys for two consumers (#347):
         #
-        # macOS only for now — self-update on Windows and Linux needs the
-        # stage-2 branches proven on those platforms first, and a URL here that
-        # nothing can install would present the user an update that always
-        # fails.
+        # - macos_url/macos_sha256: the FULL stub-first bundle zip. Old
+        #   in-the-wild launchers (pre-stub) read these and stage-2-swap
+        #   their whole bundle — that swap is their migration to the stub
+        #   architecture. Keep publishing them until no pre-stub launcher
+        #   plausibly survives.
+        # - <plat>_payload_url/<plat>_payload_sha256: payload-only archives
+        #   (a stub version dir's contents) for the bootstrap stub, on all
+        #   three platforms. The stub never reads the full-bundle keys —
+        #   feeding it the full bundle would install a stub as its own
+        #   payload.
         run: |
           set -euo pipefail
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.meta.outputs.tag }}"
           mac_zip=artifacts/launcher-macos-arm64-zip/silencer-launcher-macos-arm64.zip
-          [[ -f "$mac_zip" ]] || { echo "missing artifact: $mac_zip" >&2; exit 1; }
+          mac_payload=artifacts/launcher-macos-payload-zip/silencer-launcher-payload-macos-arm64.zip
+          win_payload=artifacts/launcher-windows-payload-zip/silencer-launcher-payload-windows-x64.zip
+          linux_payload=artifacts/launcher-linux-payload-tgz/silencer-launcher-payload-linux-x64.tar.gz
+          for f in "$mac_zip" "$mac_payload" "$win_payload" "$linux_payload"; do
+            [[ -f "$f" ]] || { echo "missing artifact: $f" >&2; exit 1; }
+          done
           jq -n \
-            --arg version   "$PROTOCOL" \
-            --arg build_id  "$BUILD_ID" \
-            --arg channel   "$CHANNEL" \
-            --arg macos_url "$base/silencer-launcher-macos-arm64.zip" \
-            --arg macos_sha "$(sha256sum "$mac_zip" | cut -d' ' -f1)" \
+            --arg version    "$PROTOCOL" \
+            --arg build_id   "$BUILD_ID" \
+            --arg channel    "$CHANNEL" \
+            --arg macos_url  "$base/silencer-launcher-macos-arm64.zip" \
+            --arg macos_sha  "$(sha256sum "$mac_zip" | cut -d' ' -f1)" \
+            --arg mac_p_url  "$base/silencer-launcher-payload-macos-arm64.zip" \
+            --arg mac_p_sha  "$(sha256sum "$mac_payload" | cut -d' ' -f1)" \
+            --arg win_p_url  "$base/silencer-launcher-payload-windows-x64.zip" \
+            --arg win_p_sha  "$(sha256sum "$win_payload" | cut -d' ' -f1)" \
+            --arg lin_p_url  "$base/silencer-launcher-payload-linux-x64.tar.gz" \
+            --arg lin_p_sha  "$(sha256sum "$linux_payload" | cut -d' ' -f1)" \
             '{version: $version, build_id: $build_id, channel: $channel,
-              macos_url: $macos_url, macos_sha256: $macos_sha}' \
+              macos_url: $macos_url, macos_sha256: $macos_sha,
+              macos_payload_url: $mac_p_url, macos_payload_sha256: $mac_p_sha,
+              windows_payload_url: $win_p_url, windows_payload_sha256: $win_p_sha,
+              linux_payload_url: $lin_p_url, linux_payload_sha256: $lin_p_sha}' \
             > update-launcher.json
           cat update-launcher.json
 
@@ -696,6 +783,9 @@ jobs:
             artifacts/linux-x64/*
             artifacts/launcher-linux-x64/*
             artifacts/launcher-macos-arm64-zip/*
+            artifacts/launcher-macos-payload-zip/*
+            artifacts/launcher-windows-payload-zip/*
+            artifacts/launcher-linux-payload-tgz/*
             update.json
             update-launcher.json
           body: |

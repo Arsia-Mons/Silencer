@@ -34,12 +34,17 @@ writable, else the per-user data dir; always the per-user dir on macOS
 (the bundle is signed and often read-only).
 
 The manifest is the existing `update-launcher.json` /
-`/api/launcher/manifest/self`: `build_id` + `<platform>_url` +
-`<platform>_sha256` (platform = `windows` | `macos` | `linux`; a missing
-platform key just means "no update"). URLs must be https, or http on
-loopback. When no version is installed the stub bootstraps from the
-manifest, else it launches the seed payload shipped beside it
-(`payload/`, macOS `Contents/Resources/payload/`).
+`/api/launcher/manifest/self`: `build_id` + `<platform>_payload_url` +
+`<platform>_payload_sha256` (platform = `windows` | `macos` | `linux`; a
+missing platform key just means "no update"). The `_payload_` infix is
+load-bearing: the plain `macos_url` key carries the FULL bundle zip that
+old in-the-wild launchers feed to their stage-2 swap (that is their
+migration path to this architecture) — pointing the stub at it would
+install a stub as its own payload. Payload archives contain exactly a
+version dir's contents. URLs must be https, or http on loopback. When
+no version is installed the stub bootstraps from the manifest, else it
+launches the seed payload shipped beside it (`payload/`, macOS
+`Contents/Resources/payload/`).
 
 ## Per-platform mechanics
 
@@ -117,9 +122,19 @@ starts.
   extract rests on `ditto`; phase 2's mac e2e must include a hostile
   archive (`../evil` entry) before the macOS path ships.
 
-## Not wired up yet (phases 2–4 on #347)
+## How this ships
 
-Packaging (DMG/installer/tarball ship stub + seed payload), the release
-e2e gate, removing the in-app self-update from `clients/launcher/`,
-publishing `windows_url`/`linux_url` in `update-launcher.json`, and
-migration of existing installs.
+The composite actions (`.github/actions/build-launcher-*`) build the
+stub next to the launcher and stage the stub-first layouts: Windows and
+Linux put the stub at the package root named `silencer-launcher(.exe)`
+with the payload under `payload/`; macOS builds the stub's own
+"Silencer Launcher.app" (`SilencerLauncherStub-Info.plist`) and nests
+the self-contained launcher app at `Contents/Resources/payload/`.
+`release.yml` publishes the per-platform payload archives, writes both
+key families into `update-launcher.json`, and gates on
+`infra/scripts/test-launcher-updater.sh` (macOS: real-payload update +
+hostile-archive case) and `tests/e2e/run.sh` (Windows/Linux jobs).
+Existing macOS installs migrate automatically: their old in-app
+stage-2 reads `macos_url`, swaps the whole bundle, and wakes up
+stub-first; a Windows installer upgrade clears the pre-stub root files
+(`[InstallDelete]`).

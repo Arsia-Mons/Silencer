@@ -39,6 +39,7 @@ jobs:
           filters: |
             relevant:
               - 'clients/launcher/**'
+              - 'clients/launcher-stub/**'
               - 'clients/lobby-sdk/cpp/**'
               - 'clients/silencer/src/ui/**'
               - 'clients/silencer/src/render/cppx_ui/**'
@@ -60,9 +61,13 @@ jobs:
 
       - name: Verify bundled dependencies
         if: steps.changes.outputs.relevant == 'true'
-        # The defaulted third argument also asserts the self-update helper at
-        # Contents/Helpers/updater-stage-2 exists and stays dependency-free.
-        run: tests/e2e/check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher"
+        # Two bundles now (stub-first layout, #347): the outer bundle is the
+        # bootstrap stub, whose binary must depend on NOTHING non-system —
+        # that is its safety property — and the nested payload app is the
+        # self-contained cppx launcher.
+        run: |
+          tests/e2e/check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher" "" strict
+          tests/e2e/check-bundle-macos.sh "build-launcher/Silencer Launcher.app/Contents/Resources/payload/Silencer Launcher.app" "Silencer Launcher" ""
 
       - if: steps.changes.outputs.relevant != 'true'
         run: echo "No launcher/reused-source/asset changes; skipping launcher macOS build."

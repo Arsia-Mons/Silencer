@@ -4,6 +4,10 @@
   "channel": "self",
   "macos_url": "http://localhost:8000/silencer-launcher-macos-arm64.zip",
   "macos_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "windows_url": "http://localhost:8000/silencer-launcher-windows-x64.zip",
-  "windows_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  "macos_payload_url": "http://localhost:8000/silencer-launcher-payload-macos-arm64.zip",
+  "macos_payload_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "windows_payload_url": "http://localhost:8000/silencer-launcher-payload-windows-x64.zip",
+  "windows_payload_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "linux_payload_url": "http://localhost:8000/silencer-launcher-payload-linux-x64.tar.gz",
+  "linux_payload_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
 }

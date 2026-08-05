@@ -3,19 +3,22 @@
 # dylib reference (in the main binary and in each bundled dylib) must resolve
 # to a file inside Contents/Frameworks/.
 #
-# Usage: tests/e2e/check-bundle-macos.sh <app> [exe-name] [helper-relpath]
+# Usage: tests/e2e/check-bundle-macos.sh <app> [exe-name] [helper-relpath] [strict]
 #
 # Defaults describe the game bundle, so the one-argument call is unchanged.
-# The launcher passes its own exe name (which contains a space — quote it) and
-# keeps the defaulted helper path, since it ships the same nested stage-2
-# helper for its own self-update:
+# The launcher's stub-first outer bundle passes "strict" (its binary must
+# depend on NOTHING non-system — that is the bootstrap stub's safety
+# property) and an empty helper path; the nested payload app is checked with
+# a second, normal call:
 #
-#   check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher"
+#   check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher" "" strict
+#   check-bundle-macos.sh ".../Contents/Resources/payload/Silencer Launcher.app" "Silencer Launcher" ""
 set -euo pipefail
 
-APP="${1:?usage: $0 <app> [exe-name] [helper-relpath]}"
+APP="${1:?usage: $0 <app> [exe-name] [helper-relpath] [strict]}"
 EXE_NAME="${2:-Silencer}"
 HELPER_REL="${3-Contents/Helpers/updater-stage-2}"
+STRICT="${4:-}"
 BINARY="$APP/Contents/MacOS/$EXE_NAME"
 FRAMEWORKS="$APP/Contents/Frameworks"
 
@@ -66,7 +69,11 @@ check_file() {
 	done <<< "$refs"
 }
 
-check_file "$BINARY"
+if [ "$STRICT" = "strict" ]; then
+	check_file "$BINARY" 0
+else
+	check_file "$BINARY"
+fi
 if [ -n "$HELPER_REL" ]; then
 	# An `[ ... ] && check_file` one-liner would exit the script under set -e
 	# on the skip path, because the whole statement then returns 1.

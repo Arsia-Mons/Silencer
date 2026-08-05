@@ -50,13 +50,26 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
+; Stub-first layout (issue #347): the root exe is the BOOTSTRAP STUB — what
+; every shortcut points at — and the cppx launcher lives under payload\ as the
+; stub's seed. fonts\ and assets\ are the two dirs resolve_resource_dir()
+; (src/main.cpp) probes beside the PAYLOAD executable. Drop either and the
+; launcher exits before a window opens — missing fonts are fatal, not a soft
+; fallback.
 Source: "{#SourceDir}\{#MyAppExe}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
-; fonts\ and assets\ are the two dirs resolve_resource_dir() (src/main.cpp)
-; probes beside the executable. Drop either and the launcher exits before a
-; window opens — missing fonts are fatal, not a soft fallback.
-Source: "{#SourceDir}\fonts\*"; DestDir: "{app}\fonts"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SourceDir}\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\payload\*"; DestDir: "{app}\payload"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+; Pre-stub installs kept the cppx launcher's DLLs + resources at the install
+; root; the stub layout moves them under payload\. Clear the stale copies so
+; an upgrade doesn't leave a half-launcher at the root beside the stub.
+Type: files; Name: "{app}\*.dll"
+Type: filesandordirs; Name: "{app}\fonts"
+Type: filesandordirs; Name: "{app}\assets"
+; A manual (re)install resets the stub's versioned store: the freshly
+; installed seed IS the current version now, and the stub re-updates forward
+; from it on next start if the manifest is ahead.
+Type: filesandordirs; Name: "{app}\versions"
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"

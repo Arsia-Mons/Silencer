@@ -60,7 +60,7 @@ try {
         ('"{0}"' -f (Join-Path $here 'serve.ts')), ('"{0}"' -f $www), $port
     ) -PassThru -WindowStyle Hidden
     Set-Content (Join-Path $www 'manifest.json') `
-        "{`"build_id`": `"00002`", `"windows_url`": `"http://127.0.0.1:$port/payload.zip`", `"windows_sha256`": `"$sha`"}"
+        "{`"build_id`": `"00002`", `"windows_payload_url`": `"http://127.0.0.1:$port/payload.zip`", `"windows_payload_sha256`": `"$sha`"}"
     $up = $false
     foreach ($i in 1..30) {
         try {

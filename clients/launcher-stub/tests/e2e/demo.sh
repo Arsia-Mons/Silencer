@@ -84,7 +84,7 @@ for _ in 1 2 3 4 5; do
   bun "$HERE/serve.ts" "$(native "$WWW")" "$PORT" &
   SERVER_PID=$!
   cp "$TMP/v2.$ARCHIVE_EXT" "$WWW/payload.$ARCHIVE_EXT"
-  printf '{"build_id": "00002", "%s_url": "http://127.0.0.1:%s/payload.%s", "%s_sha256": "%s"}\n' \
+  printf '{"build_id": "00002", "%s_payload_url": "http://127.0.0.1:%s/payload.%s", "%s_payload_sha256": "%s"}\n' \
     "$OS" "$PORT" "$ARCHIVE_EXT" "$OS" "$(sha "$TMP/v2.$ARCHIVE_EXT")" > "$WWW/manifest.json"
   ok=""
   for _ in $(seq 1 30); do

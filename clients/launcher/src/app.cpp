@@ -1,7 +1,6 @@
 #include "app.h"
 
 #include "net.h"
-#include "updaterstage2.h"
 #include "updaterzip.h"
 
 #include "silencer/lobby/client.h"
@@ -16,11 +15,6 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
-
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
-#include <sys/wait.h>
-#endif
 
 namespace launcher {
 
@@ -45,111 +39,6 @@ std::string to_lower(std::string s) {
     c = (char)std::tolower((unsigned char)c);
   return s;
 }
-
-#ifdef __APPLE__
-// ---- Developer ID check on the self-update payload -------------------------
-// The plan's substitute for Sparkle's EdDSA payload signing
-// (docs/plans/2026-08-04-launcher-self-update.md): before stage-2 swaps the
-// bundle in, prove the download was signed by the same Developer ID team as
-// the launcher that is running. A compromised manifest host cannot produce
-// that signature. The team is read from our own signature rather than baked
-// at build time, so a signed release enforces it automatically and an
-// unsigned build (dev, the e2e) has nothing to enforce and skips it.
-
-std::string sh_quote(const std::string &s) {
-  std::string out = "'";
-  for (char c : s)
-    out += (c == '\'') ? std::string("'\\''") : std::string(1, c);
-  out += "'";
-  return out;
-}
-
-std::string run_capture(const std::string &cmd, int *exit_code) {
-  *exit_code = -1;
-  FILE *p = popen((cmd + " 2>&1").c_str(), "r");
-  if (!p)
-    return "";
-  std::string out;
-  char buf[512];
-  size_t n;
-  while ((n = fread(buf, 1, sizeof(buf), p)) > 0)
-    out.append(buf, n);
-  int status = pclose(p);
-  if (WIFEXITED(status))
-    *exit_code = WEXITSTATUS(status);
-  return out;
-}
-
-// The .app this process runs from ("" when not bundled).
-std::string own_bundle_path() {
-  char buf[4096];
-  uint32_t sz = sizeof(buf);
-  if (_NSGetExecutablePath(buf, &sz) != 0)
-    return "";
-  std::string p = buf;
-  size_t slash = p.find_last_of('/');
-  if (slash == std::string::npos)
-    return "";
-  p.resize(slash); // drop the binary name
-  const std::string tail = "/Contents/MacOS";
-  if (p.size() <= tail.size() || p.compare(p.size() - tail.size(), tail.size(), tail) != 0)
-    return "";
-  p.resize(p.size() - tail.size());
-  return p;
-}
-
-// TeamIdentifier of the running bundle's signature; "" when unsigned/ad-hoc.
-std::string own_team_id() {
-  const std::string app = own_bundle_path();
-  if (app.empty())
-    return "";
-  int code = -1;
-  std::string out = run_capture("codesign -d --verbose=2 " + sh_quote(app), &code);
-  const std::string key = "TeamIdentifier=";
-  size_t pos = out.find(key);
-  if (code != 0 || pos == std::string::npos)
-    return "";
-  std::string team = out.substr(pos + key.size());
-  team = team.substr(0, team.find_first_of("\r\n"));
-  if (team == "not set")
-    return "";
-  return team;
-}
-
-bool verify_developer_id(const std::string &zip, std::string *err) {
-  const std::string team = own_team_id();
-  if (team.empty()) {
-    fprintf(stderr,
-            "[launcher] self-update: running build is unsigned; skipping the "
-            "Developer ID check\n");
-    return true;
-  }
-  const std::string staging = temp_dir() + "/silencer-launcher-self-update-stage";
-  std::error_code ec;
-  std::filesystem::remove_all(staging, ec);
-  std::filesystem::create_directories(staging, ec);
-  if (UpdaterZip::Extract(zip, staging) != UpdaterZip::OK) {
-    std::filesystem::remove_all(staging, ec);
-    *err = "Could not extract the update";
-    return false;
-  }
-  const std::string app = staging + "/Silencer Launcher.app";
-  const std::string requirement =
-      "=anchor apple generic and certificate leaf[subject.OU] = \"" + team + "\"";
-  int code = -1;
-  std::string out = run_capture("codesign --verify --strict -R " + sh_quote(requirement) +
-                                    " " + sh_quote(app),
-                                &code);
-  std::filesystem::remove_all(staging, ec);
-  if (code != 0) {
-    fprintf(stderr, "[launcher] self-update: codesign rejected the staged bundle:\n%s",
-            out.c_str());
-    *err = "The update is not signed by the developer - discarded";
-    return false;
-  }
-  return true;
-}
-#endif
 
 // The baked glyph atlases cover ASCII 33..126 only, so multi-byte UTF-8 (and
 // upper Latin-1) renders blank. Fold feed/release text to renderable bytes:
@@ -364,13 +253,6 @@ bool app_fetch_progress(void *ctx, uint64_t, uint64_t) {
   return !static_cast<App *>(ctx)->shutdown_.load();
 }
 
-bool app_self_update_progress(void *ctx, uint64_t got, uint64_t total) {
-  App *app = static_cast<App *>(ctx);
-  app->self_bytes_got_.store(got);
-  app->self_bytes_total_.store(total);
-  return !app->cancel_.load() && !app->shutdown_.load();
-}
-
 App::App() {
   config_.load();
   refresh_installed_locked(); // no contention yet: worker not started
@@ -416,9 +298,6 @@ void App::worker_main() {
     case Command::Kind::SignIn:
       run_sign_in(cmd.username, cmd.password);
       break;
-    case Command::Kind::SelfUpdate:
-      run_self_update();
-      break;
     }
   }
 }
@@ -453,7 +332,7 @@ void App::refresh_installed_locked() {
 }
 
 void App::run_refresh() {
-  std::string lobby_host, news_url, releases_url, self_url;
+  std::string lobby_host, news_url, releases_url;
   std::string manifest_urls[2];
   int lobby_port = 0;
   {
@@ -467,7 +346,6 @@ void App::run_refresh() {
     manifest_urls[1] = config_.manifest_url_nightly;
     news_url = config_.announcements_url;
     releases_url = config_.releases_url;
-    self_url = config_.manifest_url_launcher;
     lobby_host = config_.lobby_host;
     lobby_port = config_.lobby_port;
   }
@@ -521,53 +399,9 @@ void App::run_refresh() {
     }
   }
 
-  // --- The launcher's own manifest (self-update) ---
-  // macOS-only on purpose: the stage-2 handoff has only ever been exercised on
-  // macOS, and update-launcher.json carries no Windows/Linux URL. An update
-  // that always fails is worse than none offered.
-#ifdef __APPLE__
-  {
-    int http = 0;
-    std::string body =
-        fetch_text(self_url, "silencer-launcher-manifest-self.json", &http);
-    std::string build_id, dl_url, sha;
-    if (!body.empty()) {
-      try {
-        json j = json::parse(body);
-        // Compare build_id, never version: `version` is the wire protocol
-        // number two nightlies share; build_id is the build's own identity.
-        build_id = j.value("build_id", std::string());
-        if (build_id.empty())
-          build_id = j.value("version", std::string());
-        dl_url = j.value("macos_url", std::string());
-        sha = to_lower(j.value("macos_sha256", std::string()));
-      } catch (const std::exception &) {
-        build_id.clear();
-      }
-    }
-    std::lock_guard<std::mutex> lk(mtx_);
-    // Store the offer whenever the fetch produced one — a self_update()
-    // triggered before this refresh finished (the e2e does exactly that) reads
-    // these fields. Only the VERDICT is guarded, so a refresh never clobbers
-    // the status of an update already in flight.
-    if (!build_id.empty()) {
-      self_latest_ = build_id;
-      self_url_ = dl_url;
-      self_sha_ = sha;
-    }
-    if (self_update_ == SelfUpdateStatus::Unknown ||
-        self_update_ == SelfUpdateStatus::UpToDate ||
-        self_update_ == SelfUpdateStatus::Available ||
-        self_update_ == SelfUpdateStatus::Failed) {
-      if (build_id.empty())
-        self_update_ = SelfUpdateStatus::Unknown;
-      else
-        self_update_ = (build_id != SILENCER_LAUNCHER_BUILD_ID && !dl_url.empty())
-                           ? SelfUpdateStatus::Available
-                           : SelfUpdateStatus::UpToDate;
-    }
-  }
-#endif
+  // (The launcher's OWN updates are the bootstrap stub's job — see
+  // clients/launcher-stub/. This process never fetches manifest_url_launcher;
+  // the config key stays because the stub reads it from the same launcher.json.)
 
   // --- News (version-2 block feed) ---
   std::vector<Announcement> anns;
@@ -777,100 +611,6 @@ void App::run_sign_in(const std::string &username, const std::string &password) 
   }
 }
 
-void App::run_self_update() {
-  std::string url, sha, latest;
-  {
-    std::lock_guard<std::mutex> lk(mtx_);
-    url = self_url_;
-    sha = self_sha_;
-    latest = self_latest_;
-  }
-  auto fail = [this](const std::string &msg) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    self_update_ = SelfUpdateStatus::Failed;
-    self_error_ = msg;
-  };
-  if (url.empty()) {
-    fail("No launcher update available");
-    return;
-  }
-  // Hard stop when the manifest offers the build we already are. The e2e's
-  // relaunched process inherits SILENCER_LAUNCHER_TEST_SELF_UPDATE and would
-  // otherwise reinstall itself forever.
-  if (latest == SILENCER_LAUNCHER_BUILD_ID) {
-    fail("Launcher is already up to date");
-    return;
-  }
-
-  const std::string zip = temp_dir() + "/silencer-launcher-self-update.zip";
-  int http = 0;
-  std::string err;
-  UpdaterDownload::Result r =
-      downloader_.Fetch(url, zip, app_self_update_progress, this, &http, &err);
-  if (r != UpdaterDownload::OK) {
-    fail(err.empty() ? "Download failed" : err);
-    return;
-  }
-
-  {
-    std::lock_guard<std::mutex> lk(mtx_);
-    self_update_ = SelfUpdateStatus::Verifying;
-  }
-  const std::string got_sha = sha256_file_hex(zip);
-  if (got_sha.empty() || (!sha.empty() && got_sha != sha)) {
-    remove(zip.c_str());
-    fail("Checksum mismatch - download discarded");
-    return;
-  }
-#ifdef __APPLE__
-  if (!verify_developer_id(zip, &err)) {
-    remove(zip.c_str());
-    fail(err);
-    return;
-  }
-#endif
-
-  std::lock_guard<std::mutex> lk(mtx_);
-  self_zip_ = zip;
-  self_update_ = SelfUpdateStatus::Ready;
-}
-
-void App::self_update() {
-  {
-    std::lock_guard<std::mutex> lk(mtx_);
-    if (self_update_ == SelfUpdateStatus::Downloading ||
-        self_update_ == SelfUpdateStatus::Verifying ||
-        self_update_ == SelfUpdateStatus::Ready ||
-        self_update_ == SelfUpdateStatus::Spawned)
-      return;
-    // Flip before the worker picks the command up, so no settled frame shows
-    // between the click and the download.
-    self_update_ = SelfUpdateStatus::Downloading;
-    self_error_.clear();
-    self_bytes_got_.store(0);
-    self_bytes_total_.store(0);
-  }
-  enqueue({Command::Kind::SelfUpdate});
-}
-
-void App::pump_self_update() {
-  std::string zip;
-  {
-    std::lock_guard<std::mutex> lk(mtx_);
-    if (self_update_ != SelfUpdateStatus::Ready)
-      return;
-    zip = self_zip_;
-  }
-  const bool ok = UpdaterStage2::Launch(zip);
-  std::lock_guard<std::mutex> lk(mtx_);
-  if (ok) {
-    self_update_ = SelfUpdateStatus::Spawned;
-  } else {
-    self_update_ = SelfUpdateStatus::Failed;
-    self_error_ = "Could not start the update helper";
-  }
-}
-
 AppSnapshot App::snapshot() {
   std::lock_guard<std::mutex> lk(mtx_);
   AppSnapshot s;
@@ -886,14 +626,6 @@ AppSnapshot App::snapshot() {
     s.update_progress = total ? std::min(1.0f, (float)((double)got / (double)total)) : 0.0f;
   }
   s.update_error = update_error_;
-  s.self_update = self_update_;
-  s.self_latest = self_latest_;
-  {
-    const uint64_t total = self_bytes_total_.load();
-    const uint64_t got = self_bytes_got_.load();
-    s.self_progress = total ? std::min(1.0f, (float)((double)got / (double)total)) : 0.0f;
-  }
-  s.self_error = self_error_;
   s.news_status = news_status_;
   s.announcements = announcements_;
   s.releases_status = releases_status_;

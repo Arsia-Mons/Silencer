@@ -129,19 +129,32 @@ The three `build-launcher-*` jobs build `clients/launcher/` into
 `build-launcher/`, never `build/`, so a launcher job and a game job
 cannot collide on artifacts.
 
-- `build-launcher-macos` gates on its own self-update e2e
-  (`infra/scripts/test-launcher-updater.sh`, before signing, on a
-  scratch copy) and then runs the same sign → notarize → staple →
-  `create-dmg` → sign/notarize/staple-the-DMG sequence as
-  `build-macos`, on the same Apple secrets. It also signs the
-  launcher's nested `Contents/Helpers/updater-stage-2`. arm64 only, on
-  purpose (`clients/launcher/CLAUDE.md` has the reasoning).
+All three launcher jobs ship the **stub-first layout** (issue #347): the
+binary/bundle users open is the bootstrap stub
+(`clients/launcher-stub/`), with the cppx launcher nested as its seed
+payload. Each also publishes a **payload archive**
+(`silencer-launcher-payload-*`) — a stub version dir's contents — which
+`update-launcher.json` references via `<plat>_payload_url` keys; the
+plain `macos_url` keeps carrying the full bundle so pre-stub launchers
+migrate via their old stage-2 swap.
+
+- `build-launcher-macos` gates on the stub-based self-update e2e
+  (`infra/scripts/test-launcher-updater.sh`: update-to-99999 + a
+  hostile-archive case, before signing, on a scratch copy) and then
+  runs the same sign → notarize → staple → `create-dmg` →
+  sign/notarize/staple-the-DMG sequence as `build-macos`, on the same
+  Apple secrets, signing inside-out through the nested payload app.
+  arm64 only, on purpose (`clients/launcher/CLAUDE.md` has the
+  reasoning).
 - `build-launcher-windows` uses its **own** vcpkg cache path and key —
   `clients/launcher/vcpkg.json` is a different dependency set from the
   game's, so sharing `build-silencer-windows`'s cache would thrash it.
-  Produces a portable zip and an Inno Setup installer.
+  Gates on the stub mechanism e2e
+  (`clients/launcher-stub/tests/e2e/run.sh`), then produces a portable
+  zip, the payload zip, and an Inno Setup installer.
 - `build-launcher-linux` bundles SDL3 with `patchelf --set-rpath
-  '$ORIGIN'` and tars it.
+  '$ORIGIN'` (inside `payload/`), gates on the same stub mechanism
+  e2e, and tars both the bundle and the payload.
 
 Each launcher release job has a PR CI counterpart
 (`ci-build-launcher-*.yml`) running the same composite action, so the
