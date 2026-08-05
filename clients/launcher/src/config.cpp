@@ -107,8 +107,13 @@ void Config::apply_defaults() {
     manifest_url_nightly =
         "https://github.com/Arsia-Mons/Silencer/releases/download/latest/update.json";
   if (manifest_url_launcher.empty())
+    // The launcher's own rolling release, published by release-launcher.yml on
+    // a `launcher-v*` tag. NOT `/releases/latest/download/`: that redirect
+    // resolves to the newest non-prerelease in the WHOLE repo, which is a game
+    // tag, and game releases carry no update-launcher.json. It 404'd for
+    // exactly that reason before the launcher had a release of its own.
     manifest_url_launcher =
-        "https://github.com/Arsia-Mons/Silencer/releases/latest/download/update-launcher.json";
+        "https://github.com/Arsia-Mons/Silencer/releases/download/launcher-latest/update-launcher.json";
   if (announcements_url.empty())
     announcements_url = "https://arsiamons.com/announcements.json";
   if (releases_url.empty())

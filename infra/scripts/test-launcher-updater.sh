@@ -112,7 +112,7 @@ HTTP_PORT="$(pick_port)"
 HTTP_LOG="$WORK/http.log"
 
 # The launcher takes the NEW build's identity from the manifest, exactly the
-# shape release.yml's update-launcher.json step emits.
+# shape release-launcher.yml's update-launcher.json step emits.
 cat > "$HOST_DIR/update-launcher.json" <<EOF
 {
   "version": "$NEW_BUILD_ID",
