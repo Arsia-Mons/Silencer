@@ -1,0 +1,147 @@
+#include "ui/primitives.h"
+
+#include "ui/app_button.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+#include "ui/components/scroll_view.h"
+#include "ui/components/text.h"
+
+namespace launcher {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::ScrollView;
+using ::ui::components::ScrollViewProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ui::UiElement Label(const LabelProps &props) {
+  return <Text
+    key={props.key}
+    value={props.value}
+    layout={LayoutStyle{.width = props.width}}
+    style={text_style(props.color, props.size, props.face, props.align, props.wrap)}
+  />
+}
+
+::ui::UiElement Dot(const DotProps &props) {
+  StyleStatePatch style =
+      props.hollow ? ::ui::patch().background(kTransparent).border(border1(kTextFaint))
+                         .corner_radius(3.0f)
+                   : ::ui::patch().background(props.color).corner_radius(3.0f);
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.width = Length::points(6), .height = Length::points(6)}}
+    style={style}
+  />
+}
+
+::ui::UiElement Divider(const DividerProps &props) {
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.width = Length::percent(100.0f), .height = Length::points(1)}}
+    style={::ui::patch().background(kBorderDim)}
+  />
+}
+
+::ui::UiElement Spacer(const SpacerProps &props) {
+  return <Box key={props.key} layout={LayoutStyle{.flex_grow = 1.0f}} />
+}
+
+::ui::UiElement Bullet(const BulletProps &props) {
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.direction = FlexDirection::Row,
+                        .align_items = AlignItems::Start,
+                        .gap = 8}}
+  >
+    <Label key="b-m" value={props.marker} color={kTextFaint} />
+    <Label
+      key="b-t"
+      value={props.value}
+      color={kTextDim}
+      wrap={::ui::TextWrap::Words}
+      width={Length::points(props.width)}
+    />
+  </Box>
+}
+
+::ui::UiElement CenteredNote(const CenteredNoteProps &props) {
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.align_items = AlignItems::Center,
+                        .justify_content = JustifyContent::Center,
+                        .flex_grow = 1.0f}}
+  >
+    <Label key="note" value={props.value} color={props.color} />
+  </Box>
+}
+
+::ui::UiElement ListRow(const ListRowProps &props) {
+  // The sub line carries the date plus the PINNED/LATEST marker right-aligned,
+  // so the title keeps the full row width and nothing clips at the row edge.
+  ::ui::UiElement marker =
+      props.marker && props.marker[0]
+          ? Label(LabelProps{.key = "lr-mark", .value = props.marker, .color = kAccent})
+          : ::ui::empty();
+
+  return <AppButton
+    key={props.key}
+    variant={ButtonVariant::ListRow}
+    selected={props.selected}
+    on_activate={props.on_activate}
+  >
+    <Box key="lr-inner" layout={col_full(2)}>
+      <Label
+        key="lr-title"
+        value={props.title}
+        color={props.selected ? kAccentBright : kText}
+        wrap={::ui::TextWrap::Words}
+        width={Length::points(kListTextW)}
+      />
+      <Box key="lr-sr" layout={row_full(6)}>
+        <Label key="lr-sub" value={props.sub} color={kTextFaint} />
+        <Spacer key="lr-sgap" />
+        {marker}
+      </Box>
+    </Box>
+  </AppButton>
+}
+
+::ui::UiElement ListColumn(const ListColumnProps &props) {
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.width = Length::points(220),
+                        .height = Length::percent(100.0f)}}
+  >
+    <ScrollView
+      key="list-scroll"
+      id={props.key}
+      layout={LayoutStyle{.width = Length::percent(100.0f), .flex_grow = 1.0f}}
+    >
+      <Box key="list-track" layout={col_full(6)} children={props.children} />
+    </ScrollView>
+  </Box>
+}
+
+::ui::UiElement DetailPane(const DetailPaneProps &props) {
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.height = Length::percent(100.0f),
+                        .flex_grow = 1.0f,
+                        .padding = EdgeSizes{14, 14, 12, 12}}}
+    style={panel_style(kPanelSoft, kBorderDim, 3.0f)}
+  >
+    <ScrollView
+      key="detail-scroll"
+      id={props.key}
+      layout={LayoutStyle{.width = Length::percent(100.0f), .flex_grow = 1.0f}}
+    >
+      <Box key="detail-track" layout={col_full(8)} children={props.children} />
+    </ScrollView>
+  </Box>
+}
+
+} // namespace launcher

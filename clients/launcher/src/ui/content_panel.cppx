@@ -1,0 +1,78 @@
+#include "ui/content_panel.h"
+
+#include "ui.h"
+#include "ui/news_tab.h"
+#include "ui/app_button.h"
+#include "ui/primitives.h"
+#include "ui/releases_tab.h"
+#include "ui/settings_tab.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+struct TabProps {
+  const char *key = nullptr;
+  const char *label = "";
+  int index = 0;
+  UiState *st = nullptr;
+};
+
+::ui::UiElement Tab(const TabProps &props) {
+  UiState *st = props.st;
+  const int index = props.index;
+  return <AppButton
+    key={props.key}
+    variant={ButtonVariant::Tab}
+    label={props.label}
+    selected={st->tab == index}
+    on_activate={[st, index](const ::ui::ActivationEvent &) { st->tab = index; }}
+  />
+}
+
+} // namespace
+
+::ui::UiElement ContentPanel(const ContentPanelProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  UiState *st = props.st;
+
+  // RELEASES lists one channel at a time, so name which one; the other tabs
+  // are channel-independent and the label would only add noise.
+  ::ui::UiElement channel =
+      st->tab == 1 ? Label(LabelProps{.key = "tabs-ch",
+                                      .value = s.channel == "nightly" ? "NIGHTLY" : "STABLE",
+                                      .color = kTextFaint})
+                   : ::ui::empty();
+
+  ::ui::UiElement body =
+      st->tab == 0   ? NewsTab(NewsTabProps{.key = "news-cols", .st = st})
+      : st->tab == 1 ? ReleasesTab(ReleasesTabProps{.key = "rel-cols", .st = st})
+                     : SettingsTab(SettingsTabProps{.key = "set-cols"});
+
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.overflow = ::ui::Overflow::Hidden,
+                        .width = Length::percent(100.0f),
+                        .flex_grow = 1.0f,
+                        .padding = EdgeSizes{16, 16, 14, 14},
+                        .gap = 12}}
+    style={panel_style(kPanel, kBorder, 4.0f)}
+  >
+    <Box key="tabs" layout={row_full(8)}>
+      <Tab key="tab-news" label="NEWS" index={0} st={st} />
+      <Tab key="tab-releases" label="RELEASES" index={1} st={st} />
+      <Tab key="tab-settings" label="SETTINGS" index={2} st={st} />
+      <Spacer key="tabs-gap" />
+      {channel}
+    </Box>
+    {body}
+  </Box>
+}
+
+} // namespace launcher

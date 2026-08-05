@@ -39,14 +39,54 @@ Data sources:
 | `src/config.{h,cpp}` | `launcher.json` load/save + defaults (per-channel installs), plus `game_data_dir()` for the SETTINGS tab. |
 | `src/net.{h,cpp}` | TCP-connect latency ping, detached process spawn, SHA-256 hex. |
 | `src/app.{h,cpp}` | `App`: config + a single background worker (manifest/news/releases fetch, ping, lobby auth, install/uninstall) + the snapshot the UI polls + intents. |
-| `src/ui.{h,cpp}` | Phosphor-green `::ui::Theme`, the `client::ui::UiScreen`, and the view components (composed from the reused `ui::components` primitives; per-session UI state lives in `RootView`'s fiber via `use_state`). |
+| `src/ui.h` | The view's public surface: `Intents`, `ViewModel`, `LauncherContext`, `make_launcher_screen()`. |
+| `src/ui/` | The views. See below. |
 | `src/main.cpp` | SDL3 window + event loop (incl. text-input gating for the Input fields, the async folder-picker marshal for BROWSE..., and the shot-mode input script); drives `PipelineHost` and blits its RGBA. |
+
+### The views (`src/ui/`)
+
+**Every view is authored as JSX in a `.cppx`, with its props in the matching
+`.hx`** — the same authoring pipeline `clients/silencer/src/client/ui/` uses,
+through the same `tools/cppx_transpile.py`. A `.cppx` returns a tag tree;
+anything the grammar can't express (a `std::vector` of rows, a conditional
+child) is hoisted into a local above the `return` and interpolated as `{expr}`.
+The transpiler only recognises JSX in `return` position or as a tag child, so
+never assign a tag to a variable — call the component function directly
+(`Label(LabelProps{...})`), which is also how you get an element without a
+component fiber.
+
+| File | Owns |
+|---|---|
+| `tokens.h` | The palette, the glyph faces, the wrap widths, the style presets. **The only file that may hold a raw `::ui::Color`** — a view never spells out paint. |
+| `state.h` | `UiState` (tab, selections, which popover is open) + the `SILENCER_LAUNCHER_UI_STATE` seeding. Owned by `RootView`'s fiber via `use_state`, passed down as an `st` prop. |
+| `theme.cpp` | `::ui::Theme`, the `LauncherContext` providers, and the `use_snapshot()` / `use_intents()` hooks every view reads instead of prop-drilling the snapshot. |
+| `app_button.hx/.cppx` | **`AppButton` — the launcher's one button.** Every pressable surface is this component with a different `variant` (Chrome, Chip, Primary, Tab, Segment, ListRow, ChannelRow, Scrim); the variant carries both the paint and the box, `tone` picks the label colour. A new kind of button is a new variant, never another hand-rolled `ui::components::Button`. |
+| `primitives.hx/.cppx` | The rest of the shared pieces: `Label`, `Dot`, `Divider`, `Spacer`, `Bullet`, `CenteredNote`, `ListRow`, `ListColumn`, `DetailPane`. |
+| `root.cppx` | `RootView` + the `UiScreen`: topbar, content, playbar, then the overlays in paint order. |
+| `top_bar.cppx`, `content_panel.cppx`, `play_bar.cppx` | The three bands. |
+| `news_tab.cppx`, `releases_tab.cppx`, `settings_tab.cppx`, `font_qa.cppx` | The content panel's bodies. |
+| `auth_popover.cppx`, `channel_dropup.cppx`, `confirm_overlay.cppx` | The root-anchored overlays. |
+
+**A JSX `layout={...}` replaces the whole `LayoutStyle`** — it does not merge
+over `ButtonProps`/`InputProps` defaults the way field-by-field assignment did.
+Anything a control relies on has to be spelled out, including `ButtonProps`'
+132pt default width (`kControlW`), which is what keeps a row of chrome buttons
+one size whatever their labels say. Dropping it silently shrink-wraps the
+control to its text.
+
+**`Button` renders `label` only when it has no children.** Passing children —
+even two `::ui::empty()` slots — silently blanks the label, which is why the
+account chip branches into two tags instead of one with conditional children.
 
 `CMakeLists.txt` compiles the reused `clients/silencer/` sources by absolute
 path (no changes to that tree), the lobby SDK
-(`clients/lobby-sdk/cpp/src/*`), and transpiles
-`box`/`text`/`button`/`input`/`scroll_view.cppx` with the client's own
-`tools/cppx_transpile.py`.
+(`clients/lobby-sdk/cpp/src/*`), and transpiles both
+`box`/`text`/`button`/`input`/`scroll_view.cppx` and every launcher view in
+`LAUNCHER_CPPX_VIEWS` with the client's own `tools/cppx_transpile.py`. Add a
+view: write the `.hx` + `.cppx`, then add its stem to that list. Run
+`python3 ../silencer/tools/cppx_format.py --check src/ui/*.cppx src/ui/*.hx`
+before committing — the formatter canonicalises opening tags, and it is the
+same one the client's `cppx_format_check` test runs.
 
 ## Build
 
@@ -376,7 +416,7 @@ field falls back to its default instead of aborting the parse.
 - **Text sizes must be the face's native line height** (or an integer
   multiple) to stay pixel-perfect: Body 11/22, Large 15, Title 23, Tiny 7,
   Heading 19. Anything else nearest-scales the glyph cells (uneven pixel
-  duplication). `ui.cpp` authors everything at native; keep it that way.
+  duplication). `ui/tokens.h` authors everything at native; keep it that way.
   `UI_STATE=fontqa` shows the face × size ramp to eyeball this.
 - **Text wraps only at a definite *points* width** (Yoga measures the text node
   against it); `percent` does not trigger wrap. The window is therefore a fixed
@@ -391,7 +431,7 @@ field falls back to its default instead of aborting the parse.
   sequence. `shutdown_` (atomic, because the curl thread doesn't hold `mtx_`)
   is set before the join and read by both progress callbacks. Any new
   `downloader_.Fetch` call must pass one of them, never `nullptr`.
-- **Displayed paths go through `display_path` (ui.cpp)**: backslashes to
+- **Displayed paths go through `display_path` (ui/settings_tab.cppx)**: backslashes to
   forward slashes, trailing separator dropped. Not cosmetic — the atlas draws
   `\` as a dash, so an un-normalized `C:\Users\me` reads as `C:-Users-me`, a
   wrong path a user could copy down. Windows accepts forward slashes, so the

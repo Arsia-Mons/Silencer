@@ -1,0 +1,78 @@
+#include "ui/confirm_overlay.h"
+
+#include "ui.h"
+#include "ui/app_button.h"
+#include "ui/primitives.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+
+#include <string>
+
+namespace launcher {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+::ui::UiElement ConfirmOverlay(const ConfirmOverlayProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  const Intents &in = use_intents();
+  UiState *st = props.st;
+  const std::string ch = st->confirm_uninstall;
+  const ChannelState &cs = s.chan(ch);
+
+  std::string what = ch == "nightly" ? "NIGHTLY" : "STABLE";
+  if (!cs.installed.empty())
+    what += " v" + cs.installed;
+
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.position = PositionType::Absolute,
+                        .align_items = AlignItems::Center,
+                        .justify_content = JustifyContent::Center,
+                        .position_inset = EdgeSizes::all_edges(::ui::StyleValue::points(0.0f))}}
+    style={::ui::patch().background(kScrim)}
+  >
+    <Box
+      key="cf-panel"
+      layout={LayoutStyle{.width = Length::points(340),
+                          .padding = EdgeSizes{14, 14, 12, 12},
+                          .gap = 8}}
+      style={panel_style(kPopover, kBorder, 4.0f)}
+    >
+      <Label key="cf-label" value="UNINSTALL CHANNEL" color={kTextFaint} />
+      <Label key="cf-what" value={dup("Remove " + what + " from disk?")} color={kTextDim} />
+      <Label
+        key="cf-path"
+        value={dup(s.base_dir + "/" + ch)}
+        color={kTextFaint}
+        wrap={::ui::TextWrap::Words}
+        width={Length::points(kConfirmTextW)}
+      />
+      <Divider key="cf-div" />
+      <Box key="cf-btns" layout={row(8)}>
+        <AppButton
+          key="cf-yes"
+          tone={ButtonTone::Danger}
+          label="UNINSTALL"
+          on_activate={[&in, st, ch](const ::ui::ActivationEvent &) {
+            if (in.uninstall)
+              in.uninstall(ch);
+            st->confirm_uninstall.clear();
+          }}
+        />
+        <AppButton
+          key="cf-no"
+          tone={ButtonTone::Muted}
+          label="CANCEL"
+          on_activate={[st](const ::ui::ActivationEvent &) {
+            st->confirm_uninstall.clear();
+          }}
+        />
+      </Box>
+    </Box>
+  </Box>
+}
+
+} // namespace launcher

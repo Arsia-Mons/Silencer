@@ -1,0 +1,90 @@
+#include "ui/settings_tab.h"
+
+#include "config.h"
+#include "ui.h"
+#include "ui/primitives.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+
+#include <string>
+#include <vector>
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+// One labelled location. The full path wraps — a truncated path tells the user
+// nothing.
+struct PathRowProps {
+  const char *key = nullptr;
+  const char *name = "";
+  const char *path = ""; // "" renders as an Unavailable notice
+};
+
+::ui::UiElement PathRow(const PathRowProps &props) {
+  const bool missing = !props.path || !props.path[0];
+  return <Box key={props.key} layout={col_full(3)}>
+    <Label key="pr-n" value={props.name} color={kTextFaint} />
+    <Label
+      key="pr-p"
+      value={missing ? "Unavailable" : props.path}
+      color={missing ? kOffline : kText}
+      wrap={::ui::TextWrap::Words}
+      width={Length::points(kSettingsTextW)}
+    />
+  </Box>
+}
+
+} // namespace
+
+std::string display_path(std::string p) {
+  for (char &c : p)
+    if (c == '\\')
+      c = '/';
+  while (p.size() > 1 && p.back() == '/')
+    p.pop_back();
+  return p;
+}
+
+::ui::UiElement SettingsTab(const SettingsTabProps &props) {
+  const ViewModel &vm = use_launcher();
+
+  std::vector<::ui::UiElement> kids = {
+      Label(LabelProps{
+          .key = "set-h1", .value = "LAUNCHER", .color = kAccent, .size = 19,
+          .face = kFaceHeading}),
+      PathRow(PathRowProps{.key = "set-install",
+                           .name = "INSTALL LOCATION",
+                           .path = dup(display_path(vm.install_dir))}),
+      PathRow(PathRowProps{.key = "set-cfg",
+                           .name = "SETTINGS FILE",
+                           .path = dup(display_path(Config::file_path()))}),
+      Divider(DividerProps{.key = "set-div"}),
+      Label(LabelProps{
+          .key = "set-h2", .value = "GAME", .color = kAccent, .size = 19,
+          .face = kFaceHeading}),
+      PathRow(PathRowProps{.key = "set-gamedata",
+                           .name = "SETTINGS FOLDER",
+                           .path = dup(display_path(game_data_dir()))}),
+  };
+
+  // DetailPane is sized for the row wrapper NEWS/RELEASES put it in (it takes
+  // `height: 100%` of a definite parent). Dropped straight into the panel's
+  // column it overflows and pushes the playbar off the window, so give it the
+  // same wrapper even though there is no list column beside it.
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.direction = FlexDirection::Row,
+                        .align_items = AlignItems::Stretch,
+                        .width = Length::percent(100.0f),
+                        .flex_grow = 1.0f}}
+  >
+    <DetailPane key="set-pane" children={::ui::children(kids)} />
+  </Box>
+}
+
+} // namespace launcher

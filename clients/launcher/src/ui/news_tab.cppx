@@ -1,0 +1,159 @@
+#include "ui/news_tab.h"
+
+#include "ui.h"
+#include "ui/app_button.h"
+#include "ui/primitives.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+
+#include <algorithm>
+#include <string>
+#include <vector>
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+std::string flatten(const std::vector<NewsSpan> &spans) {
+  std::string out;
+  for (const auto &s : spans)
+    out += s.text;
+  return out;
+}
+
+// The clickable link chips under a paragraph.
+struct LinkChipsProps {
+  const char *key = nullptr;
+  const NewsBlock *block = nullptr;
+  const char *keybase = "";
+};
+
+::ui::UiElement LinkChips(const LinkChipsProps &props) {
+  const Intents &in = use_intents();
+  const std::string kb = props.keybase;
+  std::vector<::ui::UiElement> chips;
+  for (size_t si = 0; si < props.block->spans.size(); ++si) {
+    const NewsSpan &sp = props.block->spans[si];
+    if (sp.href.empty())
+      continue;
+    std::string url = sp.href;
+    chips.push_back(AppButton(AppButtonProps{
+        .key = dup(kb + "-l" + std::to_string(si)),
+        .label = dup(sp.text),
+        .on_activate = [&in, url](const ::ui::ActivationEvent &) {
+          if (in.open_url)
+            in.open_url(url);
+        }}));
+  }
+  return <Box key={props.key} layout={row(8)} children={::ui::children(chips)} />
+}
+
+// v1 fidelity note: the Text primitive is one style per node, so inline
+// bold/italic render flat for now; links flatten inline and additionally get a
+// clickable chip under the paragraph. Unknown block types skip.
+void append_blocks(std::vector<::ui::UiElement> *out, const std::vector<NewsBlock> &blocks,
+                   const std::string &keybase) {
+  for (size_t bi = 0; bi < blocks.size(); ++bi) {
+    const NewsBlock &b = blocks[bi];
+    const std::string kb = keybase + std::to_string(bi);
+    if (b.type == NewsBlock::Type::Heading) {
+      out->push_back(Label(LabelProps{.key = dup(kb + "-h"),
+                                      .value = dup(flatten(b.spans)),
+                                      .color = kTextFaint,
+                                      .wrap = ::ui::TextWrap::Words,
+                                      .width = Length::points(kDetailTextW)}));
+    } else if (b.type == NewsBlock::Type::Paragraph) {
+      out->push_back(Label(LabelProps{.key = dup(kb + "-p"),
+                                      .value = dup(flatten(b.spans)),
+                                      .color = kTextDim,
+                                      .wrap = ::ui::TextWrap::Words,
+                                      .width = Length::points(kDetailTextW)}));
+      const bool has_link = std::any_of(b.spans.begin(), b.spans.end(),
+                                        [](const NewsSpan &s) { return !s.href.empty(); });
+      if (has_link)
+        out->push_back(LinkChips(LinkChipsProps{
+            .key = dup(kb + "-links"), .block = &b, .keybase = dup(kb)}));
+    } else if (b.type == NewsBlock::Type::List) {
+      for (size_t li = 0; li < b.items.size(); ++li)
+        out->push_back(Bullet(BulletProps{
+            .key = dup(kb + "-i" + std::to_string(li)),
+            .marker = dup(b.ordered ? std::to_string(li + 1) + "." : "-"),
+            .value = dup(flatten(b.items[li]))}));
+    }
+  }
+}
+
+// Long titles wrap at the pane width; the date sits under them (a row would
+// push it off the pane edge).
+struct NewsHeaderProps {
+  const char *key = nullptr;
+  const char *title = "";
+  const char *date = "";
+};
+
+::ui::UiElement NewsHeader(const NewsHeaderProps &props) {
+  return <Box key={props.key} layout={col_full(2)}>
+    <Label
+      key="nh-title"
+      value={props.title}
+      size={19}
+      face={kFaceHeading}
+      wrap={::ui::TextWrap::Words}
+      width={Length::points(kDetailTextW)}
+    />
+    <Label key="nh-date" value={props.date} color={kTextFaint} />
+  </Box>
+}
+
+} // namespace
+
+::ui::UiElement NewsTab(const NewsTabProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  UiState *st = props.st;
+
+  if (s.news_status == FetchStatus::Idle || s.news_status == FetchStatus::Loading)
+    return <CenteredNote key="news-loading" value="Loading announcements..." />
+  if (s.news_status == FetchStatus::Failed)
+    return <CenteredNote key="news-failed" value="Announcements unavailable" color={kOffline} />
+  if (s.announcements.empty())
+    return <CenteredNote key="news-empty" value="No announcements" />
+
+  const int sel = std::min(st->sel_news, (int)s.announcements.size() - 1);
+
+  std::vector<::ui::UiElement> rows;
+  for (int i = 0; i < (int)s.announcements.size(); ++i) {
+    const Announcement &a = s.announcements[i];
+    rows.push_back(ListRow(ListRowProps{
+        .key = dup("news-" + std::to_string(i)),
+        .title = dup(a.title),
+        .marker = a.pinned ? "PINNED" : "",
+        .sub = dup(a.date),
+        .selected = i == sel,
+        .on_activate = [st, i](const ::ui::ActivationEvent &) { st->sel_news = i; }}));
+  }
+
+  const Announcement &a = s.announcements[sel];
+  std::vector<::ui::UiElement> detail;
+  detail.push_back(NewsHeader(
+      NewsHeaderProps{.key = "news-head", .title = dup(a.title), .date = dup(a.date)}));
+  detail.push_back(Divider(DividerProps{.key = "news-div"}));
+  append_blocks(&detail, a.blocks, "nb-" + a.slug + "-");
+
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.direction = FlexDirection::Row,
+                        .align_items = AlignItems::Stretch,
+                        .width = Length::percent(100.0f),
+                        .flex_grow = 1.0f,
+                        .gap = 12}}
+  >
+    <ListColumn key="news-list" children={::ui::children(rows)} />
+    <DetailPane key="news-detail" children={::ui::children(detail)} />
+  </Box>
+}
+
+} // namespace launcher

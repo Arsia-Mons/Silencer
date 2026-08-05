@@ -9,8 +9,10 @@ if(WIN32)
 endif()
 
 # The launcher reuses the game client's cppx UI engine + updater primitives by
-# compiling their sources directly (no changes to clients/silencer/). SIL points
-# at the client tree two dirs over.
+# compiling their sources directly — this dir adds no fork or copy of them.
+# Gaps the launcher hits (text editing, clipboard, mesh geometry) get fixed in
+# clients/silencer/ so the game gets them too. SIL points at the client tree
+# two dirs over.
 set(SIL "${CMAKE_CURRENT_SOURCE_DIR}/../silencer")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -76,6 +78,53 @@ foreach(name box text button input scroll_view)
   list(APPEND CPPX_GENERATED "${GEN_DIR}/${name}.cpp" "${GEN_DIR}/${name}.h")
 endforeach()
 
+# --- The launcher's own cppx views --------------------------------------------
+# Every launcher screen is authored as JSX in src/ui/*.cppx (props in the
+# matching .hx) and transpiled by the same tool, into the same src-mirroring
+# tree — so `#include "ui/top_bar.h"` resolves to the generated header while
+# the hand-written headers beside it (tokens.h, state.h) resolve from src/.
+# Nothing under src/ui/ is compiled directly except the plain .cpp/.h files.
+set(LAUNCHER_GEN_DIR "${GEN_ROOT}/src/ui")
+file(MAKE_DIRECTORY "${LAUNCHER_GEN_DIR}")
+
+set(LAUNCHER_CPPX_VIEWS
+  app_button
+  primitives
+  top_bar
+  news_tab
+  releases_tab
+  settings_tab
+  font_qa
+  content_panel
+  play_bar
+  auth_popover
+  channel_dropup
+  confirm_overlay)
+
+set(LAUNCHER_CPPX_GENERATED "")
+foreach(name ${LAUNCHER_CPPX_VIEWS} root)
+  # `root` is the only view with no props of its own, so it has no .hx.
+  set(view_header_dep "")
+  if(NOT name STREQUAL "root")
+    add_custom_command(
+      OUTPUT "${LAUNCHER_GEN_DIR}/${name}.h"
+      COMMAND "${Python3_EXECUTABLE}" "${CPPX_TOOL}"
+              "src/ui/${name}.hx" -o "${LAUNCHER_GEN_DIR}/${name}.h"
+      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/${name}.hx" "${CPPX_TOOL}"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" VERBATIM)
+    set(view_header_dep "${LAUNCHER_GEN_DIR}/${name}.h")
+    list(APPEND LAUNCHER_CPPX_GENERATED "${LAUNCHER_GEN_DIR}/${name}.h")
+  endif()
+  add_custom_command(
+    OUTPUT "${LAUNCHER_GEN_DIR}/${name}.cpp"
+    COMMAND "${Python3_EXECUTABLE}" "${CPPX_TOOL}"
+            "src/ui/${name}.cppx" -o "${LAUNCHER_GEN_DIR}/${name}.cpp"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/${name}.cppx" "${CPPX_TOOL}"
+            ${view_header_dep}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" VERBATIM)
+  list(APPEND LAUNCHER_CPPX_GENERATED "${LAUNCHER_GEN_DIR}/${name}.cpp")
+endforeach()
+
 # --- Reused client sources (the game-dep-free cppx UI closure) -----------------
 set(SIL_UI_RUNTIME
   src/ui/runtime/react.cpp
@@ -139,7 +188,8 @@ add_executable(silencer-launcher
   src/net.cpp
   src/app.cpp
   src/backgrounds.cpp
-  src/ui.cpp
+  src/ui/theme.cpp
+  ${LAUNCHER_CPPX_GENERATED}
   ${CPPX_GENERATED}
   ${SIL_SOURCES}
   ${LOBBY_SDK_SOURCES})

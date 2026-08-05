@@ -53,6 +53,12 @@ extern ReactContext LauncherContext; // current = const ViewModel*
 
 const ViewModel &use_launcher();
 
+// The two halves every view reads. Both fall back to an empty singleton, so a
+// component can be rendered outside the provider (tests, a bare frame) without
+// dereferencing a null pointer.
+const AppSnapshot &use_snapshot();
+const Intents &use_intents();
+
 const ::ui::Theme &launcher_theme();
 
 // Wraps the screen root with the theme + launcher-view-model providers. Passed

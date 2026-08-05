@@ -1,0 +1,122 @@
+#include "ui/releases_tab.h"
+
+#include "ui.h"
+#include "ui/primitives.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+
+#include <algorithm>
+#include <string>
+#include <vector>
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+// Stable tags are numeric ("20260801"); the nightly prerelease carries a
+// display name ("Latest master (sha)") that takes no "v" prefix.
+std::string display_version(const std::string &v) {
+  return (!v.empty() && v[0] >= '0' && v[0] <= '9') ? "v" + v : v;
+}
+
+// Same shape as the news head: the version wraps (nightly "Latest master
+// (sha)" names are long), date + install state on the line under it.
+struct ReleaseHeaderProps {
+  const char *key = nullptr;
+  const char *version = "";
+  const char *date = "";
+  bool installed = false;
+};
+
+::ui::UiElement ReleaseHeader(const ReleaseHeaderProps &props) {
+  ::ui::UiElement installed =
+      props.installed
+          ? Label(LabelProps{.key = "rh-inst", .value = "installed", .color = kTextDim})
+          : ::ui::empty();
+  return <Box key={props.key} layout={col_full(2)}>
+    <Label
+      key="rh-ver"
+      value={props.version}
+      size={19}
+      face={kFaceHeading}
+      wrap={::ui::TextWrap::Words}
+      width={Length::points(kDetailTextW)}
+    />
+    <Box key="rh-sub" layout={row_full(10)}>
+      <Label key="rh-date" value={props.date} color={kTextFaint} />
+      <Spacer key="rh-gap" />
+      {installed}
+    </Box>
+  </Box>
+}
+
+} // namespace
+
+::ui::UiElement ReleasesTab(const ReleasesTabProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  UiState *st = props.st;
+
+  if (s.releases_status == FetchStatus::Idle || s.releases_status == FetchStatus::Loading)
+    return <CenteredNote key="rel-loading" value="Loading releases..." />
+  if (s.releases_status == FetchStatus::Failed)
+    return <CenteredNote key="rel-failed" value="Releases unavailable" color={kOffline} />
+
+  const bool nightly = s.channel == "nightly";
+  const std::vector<Release> &list = nightly ? s.releases_nightly : s.releases_stable;
+  if (list.empty())
+    return <CenteredNote key="rel-empty" value={dup("No releases for " + s.channel)} />
+
+  const std::string installed = s.active().installed;
+  const int sel = std::min(st->sel_release, (int)list.size() - 1);
+
+  std::vector<::ui::UiElement> rows;
+  for (int i = 0; i < (int)list.size(); ++i) {
+    const Release &r = list[i];
+    std::string sub = r.date;
+    if (!installed.empty() && r.version == installed)
+      sub += " - INSTALLED";
+    rows.push_back(ListRow(ListRowProps{
+        .key = dup("rel-" + std::to_string(i)),
+        .title = dup(display_version(r.version)),
+        .marker = (i == 0) ? "LATEST" : "",
+        .sub = dup(sub),
+        .selected = i == sel,
+        .on_activate = [st, i](const ::ui::ActivationEvent &) { st->sel_release = i; }}));
+  }
+
+  const Release &r = list[sel];
+  std::vector<::ui::UiElement> detail;
+  detail.push_back(ReleaseHeader(
+      ReleaseHeaderProps{.key = "rel-head",
+                         .version = dup(display_version(r.version)),
+                         .date = dup(r.date),
+                         .installed = !installed.empty() && r.version == installed}));
+  detail.push_back(Divider(DividerProps{.key = "rel-div"}));
+  if (r.notes.empty()) {
+    detail.push_back(Label(LabelProps{.key = "rel-nonotes",
+                                      .value = "No notes for this release.",
+                                      .color = kTextFaint}));
+  } else {
+    for (size_t i = 0; i < r.notes.size(); ++i)
+      detail.push_back(Bullet(BulletProps{.key = dup("rn-" + std::to_string(i)),
+                                          .value = dup(r.notes[i])}));
+  }
+
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.direction = FlexDirection::Row,
+                        .align_items = AlignItems::Stretch,
+                        .width = Length::percent(100.0f),
+                        .flex_grow = 1.0f,
+                        .gap = 12}}
+  >
+    <ListColumn key="rel-list" children={::ui::children(rows)} />
+    <DetailPane key="rel-detail" children={::ui::children(detail)} />
+  </Box>
+}
+
+} // namespace launcher

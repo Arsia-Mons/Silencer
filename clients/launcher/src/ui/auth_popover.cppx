@@ -1,0 +1,162 @@
+#include "ui/auth_popover.h"
+
+#include "ui.h"
+#include "ui/app_button.h"
+#include "ui/primitives.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+#include "ui/components/input.h"
+
+#include <string>
+#include <vector>
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+
+// Signed in: who you are, and the way out.
+struct SignedInBodyProps {
+  const char *key = nullptr;
+  UiState *st = nullptr;
+};
+
+::ui::UiElement SignedInBody(const SignedInBodyProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  const Intents &in = use_intents();
+  UiState *st = props.st;
+  return <Box key={props.key} layout={col_full(8)}>
+    <Box key="ap-who" layout={row(8)}>
+      <Dot key="ap-dot" color={kOnline} />
+      <Label key="ap-name" value={dup(s.auth_username)} />
+    </Box>
+    <Label
+      key="ap-id"
+      value={dup("account #" + std::to_string(s.auth_account_id))}
+      color={kTextFaint}
+    />
+    <Label
+      key="ap-note"
+      value="The game still asks you to sign in when it starts."
+      color={kTextFaint}
+      wrap={::ui::TextWrap::Words}
+      width={Length::points(kAuthTextW)}
+    />
+    <Divider key="ap-div" />
+    <AppButton
+      key="ap-signout"
+      tone={ButtonTone::Muted}
+      label="SIGN OUT"
+      on_activate={[&in, st](const ::ui::ActivationEvent &) {
+        if (in.sign_out)
+          in.sign_out();
+        st->auth_open = false;
+      }}
+    />
+  </Box>
+}
+
+// Signed out: the credentials form. New usernames register on the way in.
+struct SignInFormProps {
+  const char *key = nullptr;
+  UiState *st = nullptr;
+};
+
+::ui::UiElement SignInForm(const SignInFormProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  const Intents &in = use_intents();
+  UiState *st = props.st;
+  const bool busy = s.auth == AuthStatus::Connecting;
+
+  ::ui::UiElement error =
+      (s.auth == AuthStatus::Failed && !s.auth_error.empty())
+          ? Label(LabelProps{.key = "ap-err",
+                             .value = dup(s.auth_error),
+                             .color = kOffline,
+                             .wrap = ::ui::TextWrap::Words,
+                             .width = Length::points(kAuthTextW)})
+          : ::ui::empty();
+
+  return <Box key={props.key} layout={col_full(8)}>
+    <Input
+      key="ap-user"
+      id="ap-user"
+      disabled={busy}
+      focusable
+      autofocus
+      value={dup(st->user_text)}
+      on_change={[st](const std::string &v) { st->user_text = v.substr(0, 16); }}
+      layout={LayoutStyle{.justify_content = JustifyContent::Center,
+                          .width = Length::points(kAuthTextW),
+                          .height = Length::points(28),
+                          .padding = EdgeSizes{8, 8, 0, 0}}}
+      style={input_style()}
+    />
+    <Input
+      key="ap-pass"
+      id="ap-pass"
+      disabled={busy}
+      focusable
+      value={dup(st->pass_text)}
+      on_change={[st](const std::string &v) { st->pass_text = v.substr(0, 28); }}
+      password
+      layout={LayoutStyle{.justify_content = JustifyContent::Center,
+                          .width = Length::points(kAuthTextW),
+                          .height = Length::points(28),
+                          .padding = EdgeSizes{8, 8, 0, 0}}}
+      style={input_style()}
+    />
+    <AppButton
+      key="ap-go"
+      disabled={busy || st->user_text.empty() || st->pass_text.empty()}
+      label={busy ? "SIGNING IN..." : "SIGN IN / REGISTER"}
+      on_activate={[&in, st](const ::ui::ActivationEvent &) {
+        if (in.sign_in)
+          in.sign_in(st->user_text, st->pass_text);
+      }}
+      width={Length::points(kAuthTextW)}
+      height={Length::points(28)}
+    />
+    {error}
+    <Label
+      key="ap-hint"
+      value="New usernames are registered automatically."
+      color={kTextFaint}
+      wrap={::ui::TextWrap::Words}
+      width={Length::points(kAuthTextW)}
+    />
+  </Box>
+}
+
+} // namespace
+
+::ui::UiElement AuthPopover(const AuthPopoverProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  UiState *st = props.st;
+
+  ::ui::UiElement body =
+      s.auth == AuthStatus::SignedIn
+          ? SignedInBody(SignedInBodyProps{.key = "ap-body", .st = st})
+          : SignInForm(SignInFormProps{.key = "ap-body", .st = st});
+
+  // Root-anchored: below the topbar (18 pad + 48 bar + 6), right-aligned.
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.position = PositionType::Absolute,
+                        .width = Length::points(252),
+                        .padding = EdgeSizes{12, 12, 10, 10},
+                        .position_inset = EdgeSizes{{}, 30.0f, 72.0f, {}},
+                        .gap = 8}}
+    style={panel_style(kPopover, kBorder, 4.0f)}
+  >
+    <Label key="ap-label" value="ACCOUNT" color={kTextFaint} />
+    {body}
+  </Box>
+}
+
+} // namespace launcher
