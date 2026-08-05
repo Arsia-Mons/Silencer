@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Make a built SilencerLauncher.app self-contained on macOS.
+# Make a built Silencer Launcher.app self-contained on macOS.
 #
 # CMake links SDL3 and SDL3_ttf by absolute path (/opt/homebrew/... locally,
 # a per-runner install dir in CI), so a freshly built bundle only launches on
@@ -10,14 +10,19 @@
 # Run it after a build; it is not part of the build, because dev runs do not
 # need it and dylibbundler is slow.
 #
-#   clients/launcher/package-macos.sh [path/to/SilencerLauncher.app]
+#   clients/launcher/package-macos.sh ["path/to/Silencer Launcher.app"]
+#
+# The bundle name has a SPACE in it. Every path here is quoted for that
+# reason; `find -print0 | xargs -0` in the CI signing step is there for the
+# same reason. Unquote something and it fails on a path component, not on
+# the whole path, which reads as a mysterious "no such file".
 #
 # Mirrors .github/actions/build-silencer-macos/action.yml, which does the same
 # for the game. Keep the two in step.
 set -euo pipefail
 
-APP="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/build/SilencerLauncher.app}"
-BIN="$APP/Contents/MacOS/SilencerLauncher"
+APP="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/build/Silencer Launcher.app}"
+BIN="$APP/Contents/MacOS/Silencer Launcher"
 
 [ -x "$BIN" ] || { echo "no launcher binary at $BIN (build first)" >&2; exit 1; }
 

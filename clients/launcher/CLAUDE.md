@@ -75,9 +75,18 @@ MSVC `/Od` compiles them literally — measured 4–9× on the frame loop, enoug
 to drop a vsync'd 60fps to 30. `build-release/` (plain Release) exists for
 perf measurement.
 
-The build output is `build/SilencerLauncher.app` (macOS — a real bundle, so
+The build output is `build/Silencer Launcher.app` (macOS — a real bundle, so
 the resources travel with the binary and codesigning has something to sign) /
 `build\silencer-launcher.exe` (Windows).
+
+**The macOS bundle name has a space in it.** `OUTPUT_NAME` is
+`Silencer Launcher`, so the binary is `Contents/MacOS/Silencer Launcher` and
+the Finder name matches `CFBundleName`. Every path in `package-macos.sh`, the
+CI action and `release.yml` is quoted for that reason, and the CI signing step
+uses `find -print0 | xargs -0`. An unquoted path splits at the space and fails
+on a *component*, which reads as a puzzling "no such file". Windows and Linux
+keep the hyphenated `silencer-launcher` — the space buys nothing without a
+bundle.
 
 The bundle's `Info.plist` comes from `SilencerLauncher-Info.plist`, and its
 icon is `shared/icons/icon.icns` — the game's icon, shared on purpose: one
@@ -93,7 +102,7 @@ template uses `${MACOSX_BUNDLE_EXECUTABLE_NAME}` and
 still has the Xcode spellings and therefore ships an empty `CFBundleExecutable`;
 it only launches because Launch Services falls back to the bundle name, which
 happens to match. Don't copy that file's spellings.) Check with
-`plutil -p build/SilencerLauncher.app/Contents/Info.plist` — a wrong variable
+`plutil -p build/Silencer Launcher.app/Contents/Info.plist` — a wrong variable
 name is silently an empty string, never an error.
 
 The build **stages its own resources**: the five `shared/fonts/*.otf` faces and
@@ -113,7 +122,7 @@ A fresh build links Homebrew SDL3/SDL3_ttf by absolute path, so it only runs
 where those exist. Make the bundle self-contained:
 
 ```bash
-clients/launcher/package-macos.sh   # defaults to build/SilencerLauncher.app
+clients/launcher/package-macos.sh   # defaults to build/Silencer Launcher.app
 ```
 
 It copies every non-system dylib into `Contents/Frameworks` (SDL3, SDL3_ttf and
@@ -175,7 +184,7 @@ would have given. Nothing is built.
 ## Run
 
 ```bash
-clients/launcher/build/SilencerLauncher.app/Contents/MacOS/SilencerLauncher
+"clients/launcher/build/Silencer Launcher.app/Contents/MacOS/Silencer Launcher"
 ```
 
 Fonts and assets resolve through `resolve_resource_dir()` (main.cpp), in order:
@@ -237,7 +246,7 @@ scratch config at it.
 
 ```bash
 SILENCER_LAUNCHER_CONFIG=/tmp/cfg.json SILENCER_LAUNCHER_SHOT=/tmp/shot.png \
-  clients/launcher/build/SilencerLauncher
+  "clients/launcher/build/Silencer Launcher.app/Contents/MacOS/Silencer Launcher"
 ```
 
 ## Config
@@ -356,7 +365,7 @@ field falls back to its default instead of aborting the parse.
 ## Verify
 
 Configure + build, then run with `SILENCER_LAUNCHER_SHOT` and inspect the
-PNGs. **Test packaging by copying `build/SilencerLauncher.app` somewhere
+PNGs. **Test packaging by copying `build/Silencer Launcher.app` somewhere
 outside the repo and running it from there** — the resource staging is
 invisible from a `build/` run, which happily falls back to the source tree.
 Confirm the `backgrounds: N loaded from ...` line names the bundle's own
@@ -365,7 +374,7 @@ prove the dylibs too — `DYLD_PRINT_LIBRARIES=1` must show SDL3 loading from th
 copy's own `Contents/Frameworks`, since `otool -L` alone only shows intent:
 
 ```bash
-DYLD_PRINT_LIBRARIES=1 /path/to/copy/SilencerLauncher.app/Contents/MacOS/SilencerLauncher 2>&1 | grep SDL3
+DYLD_PRINT_LIBRARIES=1 "/path/to/copy/Silencer Launcher.app/Contents/MacOS/Silencer Launcher" 2>&1 | grep SDL3
 ``` Cover: the fresh state (news + INSTALL), `UI_STATE=releases,drop`
 (tabs + channel drop-up), `UI_STATE=settings` (paths panel — check the
 playbar is still on screen), `UI_STATE=auth` (sign-in form),

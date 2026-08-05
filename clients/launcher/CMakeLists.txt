@@ -205,7 +205,10 @@ if(APPLE)
 
   set_target_properties(silencer-launcher PROPERTIES
     MACOSX_BUNDLE TRUE
-    OUTPUT_NAME "SilencerLauncher"
+    # With a space, so the bundle is "Silencer Launcher.app" and the Finder
+    # name matches CFBundleName. Everything downstream (package-macos.sh, the
+    # CI action, release.yml) therefore has to quote its paths.
+    OUTPUT_NAME "Silencer Launcher"
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/SilencerLauncher-Info.plist"
     MACOSX_BUNDLE_BUNDLE_NAME "Silencer Launcher"
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.arsiamons.silencer.launcher"

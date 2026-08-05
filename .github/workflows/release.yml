@@ -228,14 +228,17 @@ jobs:
           # and no output at all. --force overrides the ad-hoc signature the
           # script applied. --options runtime (Hardened Runtime) + --timestamp
           # are both required by notarytool.
-          find SilencerLauncher.app/Contents/Frameworks -name "*.dylib" -print0 \
+          #
+          # "Silencer Launcher.app" has a space: every path below is quoted,
+          # and the find pipe uses -print0/-0 for the same reason.
+          find "Silencer Launcher.app/Contents/Frameworks" -name "*.dylib" -print0 \
             | xargs -0 -n1 codesign --force --timestamp --options runtime \
               --sign "$IDENTITY"
           codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" SilencerLauncher.app/Contents/MacOS/SilencerLauncher
+            --sign "$IDENTITY" "Silencer Launcher.app/Contents/MacOS/Silencer Launcher"
           codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" SilencerLauncher.app
-          codesign --verify --deep --strict --verbose=2 SilencerLauncher.app
+            --sign "$IDENTITY" "Silencer Launcher.app"
+          codesign --verify --deep --strict --verbose=2 "Silencer Launcher.app"
 
       - name: Notarize and staple
         working-directory: build-launcher
@@ -244,16 +247,16 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          ditto -ck --keepParent SilencerLauncher.app /tmp/notarize-launcher.zip
+          ditto -ck --keepParent "Silencer Launcher.app" /tmp/notarize-launcher.zip
           xcrun notarytool submit /tmp/notarize-launcher.zip \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait
           rm /tmp/notarize-launcher.zip
-          xcrun stapler staple SilencerLauncher.app
-          xcrun stapler validate SilencerLauncher.app
-          spctl -a -vv -t execute SilencerLauncher.app
+          xcrun stapler staple "Silencer Launcher.app"
+          xcrun stapler validate "Silencer Launcher.app"
+          spctl -a -vv -t execute "Silencer Launcher.app"
 
       - name: Build, sign, notarize, staple DMG
         working-directory: build-launcher
@@ -271,11 +274,11 @@ jobs:
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "SilencerLauncher.app" 175 200 \
-            --hide-extension "SilencerLauncher.app" \
+            --icon "Silencer Launcher.app" 175 200 \
+            --hide-extension "Silencer Launcher.app" \
             --app-drop-link 425 200 \
             silencer-launcher-macos-arm64.dmg \
-            SilencerLauncher.app
+            "Silencer Launcher.app"
           codesign --force --timestamp \
             --sign "Developer ID Application" \
             silencer-launcher-macos-arm64.dmg

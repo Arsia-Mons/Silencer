@@ -64,12 +64,12 @@ runs:
       # developers run locally, so CI and a desk build cannot drift.
       # setup-sdl exports SDL3_ROOT / SDL3_ttf_ROOT, which the script reads as
       # dylibbundler search paths.
-      run: bash clients/launcher/package-macos.sh "$BUILD_DIR/SilencerLauncher.app"
+      run: bash clients/launcher/package-macos.sh "$BUILD_DIR/Silencer Launcher.app"
 
     - name: Show bundle
       shell: bash
       env:
         BUILD_DIR: ${{ inputs.build-dir }}
       run: |
-        plutil -p "$BUILD_DIR/SilencerLauncher.app/Contents/Info.plist"
-        ls -R "$BUILD_DIR/SilencerLauncher.app/Contents/Resources" | head -40
+        plutil -p "$BUILD_DIR/Silencer Launcher.app/Contents/Info.plist"
+        ls -R "$BUILD_DIR/Silencer Launcher.app/Contents/Resources" | head -40

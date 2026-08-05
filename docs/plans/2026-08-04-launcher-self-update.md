@@ -3,7 +3,7 @@
 Status: **proposal, nothing built.** Issue #338, task 7.
 
 The launcher installs and updates the *game*. Nothing updates the
-*launcher*. A user who drags `SilencerLauncher.app` out of the DMG keeps
+*launcher*. A user who drags `Silencer Launcher.app` out of the DMG keeps
 that build until they download a new DMG by hand. This document picks a
 mechanism before any of it is written.
 
@@ -109,7 +109,7 @@ Sparkle. Before swapping the new bundle in, verify it is *our* build:
 ```sh
 codesign --verify --strict \
   -R '=anchor apple generic and certificate leaf[subject.OU] = "<TEAM_ID>"' \
-  <staged>/SilencerLauncher.app
+  "<staged>/Silencer Launcher.app"
 ```
 
 A tampered payload from a compromised manifest host fails that check,
