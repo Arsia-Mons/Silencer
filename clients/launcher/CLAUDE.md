@@ -366,7 +366,9 @@ prototypes could share; Tauri is gone, so the contract went with it.)
 
 Keys: `channel`, `base_dir`,
 `installed_stable`, `installed_nightly`, `manifest_url_stable`,
-`manifest_url_nightly`, `announcements_url` (the shared/news v2 feed —
+`manifest_url_nightly`, `manifest_url_launcher` (the launcher's **own**
+build, for self-update — not a game channel, so it follows stable releases
+only), `announcements_url` (the shared/news v2 feed —
 production default `https://arsiamons.com/announcements.json`),
 `releases_url` (GitHub Releases API), `lobby_host`, `lobby_port`. Each
 

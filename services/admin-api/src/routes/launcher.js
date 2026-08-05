@@ -1,7 +1,8 @@
 /**
  * Launcher endpoints — every HTTP request clients/launcher makes.
  *
- * GET /launcher/manifest/:channel — update.json for `stable` | `nightly`
+ * GET /launcher/manifest/:channel — update.json for `stable` | `nightly`,
+ *                                   or `self` for the launcher's own build
  * GET /launcher/news              — shared/news v2 block-AST feed
  * GET /launcher/releases          — GitHub Releases
  *
@@ -30,6 +31,10 @@ import {
 const router = Router();
 
 const CHANNELS = ['stable', 'nightly'];
+// `self` is the launcher's own manifest, which it polls to update itself. It is
+// not a game channel — the launcher ships on one track — but it resolves by the
+// same rule, so it shares the handler rather than duplicating it.
+const MANIFESTS = [...CHANNELS, 'self'];
 const PROXY_TTL_MS = 5 * 60 * 1000;
 
 const proxyCache = new Map(); // url -> { at, body }
@@ -76,11 +81,11 @@ async function proxyJson(url, res, label) {
   }
 }
 
-// GET /launcher/manifest/:channel — public
+// GET /launcher/manifest/:channel — public. `stable` | `nightly` | `self`.
 router.get('/manifest/:channel', (req, res) => {
   const { channel } = req.params;
-  if (!CHANNELS.includes(channel)) {
-    return res.status(400).json({ error: `Unknown channel "${channel}"` });
+  if (!MANIFESTS.includes(channel)) {
+    return res.status(400).json({ error: `Unknown manifest "${channel}"` });
   }
   try {
     const manifest = readJsonFile(join(LAUNCHER_DIR, `manifest-${channel}.json`));

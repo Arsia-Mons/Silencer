@@ -327,6 +327,22 @@ jobs:
           xcrun stapler validate "Silencer Launcher.app"
           spctl -a -vv -t execute "Silencer Launcher.app"
 
+      - name: Zip the stapled bundle for self-update
+        working-directory: build-launcher
+        # Self-update consumes a zip, not the DMG — the same shape the game's
+        # updater takes, so updaterzip.cpp extracts it with ditto unchanged.
+        # Zipped AFTER stapling, so a self-updated launcher carries its own
+        # notarization ticket and launches offline exactly like a DMG install.
+        run: |
+          ditto -ck --keepParent --sequesterRsrc \
+            "Silencer Launcher.app" silencer-launcher-macos-arm64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-macos-arm64-zip
+          path: build-launcher/silencer-launcher-macos-arm64.zip
+          if-no-files-found: error
+
       - name: Build, sign, notarize, staple DMG
         working-directory: build-launcher
         env:
@@ -607,6 +623,32 @@ jobs:
             > update.json
           cat update.json
 
+      - name: Build launcher update manifest
+        # The launcher's own manifest, served at /api/launcher/manifest/self
+        # and consumed by its self-updater. Separate from update.json because
+        # it describes a different payload: the launcher ships on one track,
+        # so this follows stable releases only.
+        #
+        # macOS only for now — self-update on Windows and Linux needs the
+        # stage-2 branches proven on those platforms first, and a URL here that
+        # nothing can install would present the user an update that always
+        # fails.
+        run: |
+          set -euo pipefail
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.meta.outputs.tag }}"
+          mac_zip=artifacts/launcher-macos-arm64-zip/silencer-launcher-macos-arm64.zip
+          [[ -f "$mac_zip" ]] || { echo "missing artifact: $mac_zip" >&2; exit 1; }
+          jq -n \
+            --arg version   "$PROTOCOL" \
+            --arg build_id  "$BUILD_ID" \
+            --arg channel   "$CHANNEL" \
+            --arg macos_url "$base/silencer-launcher-macos-arm64.zip" \
+            --arg macos_sha "$(sha256sum "$mac_zip" | cut -d' ' -f1)" \
+            '{version: $version, build_id: $build_id, channel: $channel,
+              macos_url: $macos_url, macos_sha256: $macos_sha}' \
+            > update-launcher.json
+          cat update-launcher.json
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
@@ -624,7 +666,9 @@ jobs:
             artifacts/launcher-windows-x64-setup/*
             artifacts/linux-x64/*
             artifacts/launcher-linux-x64/*
+            artifacts/launcher-macos-arm64-zip/*
             update.json
+            update-launcher.json
           body: |
             ## Downloads — game
 

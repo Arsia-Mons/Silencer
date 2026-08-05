@@ -7,6 +7,7 @@ they are dev fixtures, not what production serves.
 |---|---|---|
 | `manifest-stable.json` | `GET /api/launcher/manifest/stable` | 404 |
 | `manifest-nightly.json` | `GET /api/launcher/manifest/nightly` | 404 |
+| `manifest-self.json` | `GET /api/launcher/manifest/self` — the launcher's own build, for self-update | 404 |
 | `announcements.json` | `GET /api/launcher/news` | falls back to the real compiled feed at `web/website/announcements.json` |
 | `releases.json` | `GET /api/launcher/releases` | proxies `LAUNCHER_RELEASES_URL` (GitHub), cached 5 min |
 

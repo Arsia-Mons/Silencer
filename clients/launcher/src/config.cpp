@@ -106,6 +106,9 @@ void Config::apply_defaults() {
   if (manifest_url_nightly.empty())
     manifest_url_nightly =
         "https://github.com/Arsia-Mons/Silencer/releases/download/latest/update.json";
+  if (manifest_url_launcher.empty())
+    manifest_url_launcher =
+        "https://github.com/Arsia-Mons/Silencer/releases/latest/download/update-launcher.json";
   if (announcements_url.empty())
     announcements_url = "https://arsiamons.com/announcements.json";
   if (releases_url.empty())
@@ -134,6 +137,7 @@ bool Config::load() {
       str("installed_nightly", installed_nightly);
       str("manifest_url_stable", manifest_url_stable);
       str("manifest_url_nightly", manifest_url_nightly);
+      str("manifest_url_launcher", manifest_url_launcher);
       str("announcements_url", announcements_url);
       str("releases_url", releases_url);
       str("lobby_host", lobby_host);
@@ -156,6 +160,7 @@ bool Config::save() const {
   j["installed_nightly"] = installed_nightly;
   j["manifest_url_stable"] = manifest_url_stable;
   j["manifest_url_nightly"] = manifest_url_nightly;
+  j["manifest_url_launcher"] = manifest_url_launcher;
   j["announcements_url"] = announcements_url;
   j["releases_url"] = releases_url;
   j["lobby_host"] = lobby_host;

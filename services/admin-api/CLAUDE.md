@@ -60,8 +60,12 @@ unit + env file + Mongo/LavinMQ co-location are described in
   Deliberately no third tier reading `web/website/announcements.json`: that
   path only exists outside the container, so it made local and prod take
   different branches. Keep the resolution identical in both. A
-  manifest has no upstream, so an unpublished channel is a 404 — which is the
-  permanent state of `nightly` until a nightly build pipeline exists.
+  manifest has no upstream, so an unpublished channel is a 404.
+  `:channel` accepts `stable`, `nightly`, and `self` — the last is the
+  launcher's own build, which it polls to update itself. It is not a game
+  channel (the launcher ships on one track) but resolves by the same rule, so
+  it shares the handler. Manifests are produced by `release.yml`'s `release`
+  job; `nightly` is republished by its 07:00 UTC cron.
 - `src/routes/players.js` — `PATCH /:id/ban` and `DELETE /:id`
   proxy to the lobby's internal HTTP (`LOBBY_PLAYER_AUTH_URL`)
   so live clients are kicked. Lobby unreachable is logged but

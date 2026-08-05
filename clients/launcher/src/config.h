@@ -15,6 +15,9 @@ struct Config {
   std::string installed_nightly;
   std::string manifest_url_stable;
   std::string manifest_url_nightly;
+  // The launcher's own build, for self-update. Not a game channel: the
+  // launcher ships on one track, so this follows stable releases only.
+  std::string manifest_url_launcher;
   std::string announcements_url;
   std::string releases_url; // GitHub Releases API for the RELEASES tab
   std::string lobby_host;   // ping chip + sign-in target
