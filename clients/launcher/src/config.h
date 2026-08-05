@@ -5,7 +5,7 @@
 
 namespace launcher {
 
-// The launcher's on-disk config at ~/.config/silencer-launcher/launcher.json.
+// The launcher's on-disk config, in the per-OS app-data dir (see dir_path()).
 // Installs are per-channel: each channel extracts into {base_dir}/{channel}
 // and tracks its own installed version.
 struct Config {
@@ -20,7 +20,10 @@ struct Config {
   std::string lobby_host;   // ping chip + sign-in target
   int lobby_port = 517;
 
-  // ~/.config/silencer-launcher and the launcher.json path inside it.
+  // The per-OS config dir and the launcher.json path inside it:
+  // macOS   ~/Library/Application Support/Silencer Launcher
+  // Windows %APPDATA%\Silencer Launcher
+  // Linux   ~/.config/silencer-launcher
   static std::string dir_path();
   static std::string file_path();
 
@@ -41,6 +44,16 @@ struct Config {
   const std::string &installed(const std::string &channel) const;
   void set_installed(const std::string &channel, const std::string &version);
 };
+
+// Where the *game* keeps its own per-user files (config.cfg, keybinds/,
+// level/download/, replays/). Shown read-only by the SETTINGS tab.
+//
+// This mirrors GetDataDir() in clients/silencer/src/platform/os.cpp by hand
+// rather than compiling that file in: os.cpp includes the game's shared.h
+// (far outside the launcher's dep closure), and GetDataDir() *creates* the
+// directory as a side effect — opening a settings page must not conjure a
+// game data dir for someone who has never run the game. Keep the two in sync.
+std::string game_data_dir();
 
 } // namespace launcher
 

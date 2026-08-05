@@ -16,6 +16,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <random>
 #include <string>
 #include <vector>
@@ -29,14 +30,65 @@
 
 namespace {
 
+// Resource lookup, in order:
+//   1. the env override — wins outright, even if the dir turns out to be bad,
+//      so a test can point at an empty dir and see the failure,
+//   2. shipped beside the binary: SDL_GetBasePath is the bundle's
+//      Contents/Resources on macOS and the executable's dir elsewhere,
+//   3. the compile-time source-tree path, for running out of build/.
+//
+// (2) is probed with a sentinel file rather than assumed. An installed copy
+// has no source tree to fall back on and a bare dev build has nothing staged
+// beside it, so whichever of the two exists is the right answer. Without this
+// the baked absolute path is all there is, and a launcher copied off the build
+// machine dies in PipelineHost::ensure before it ever opens a window.
+std::string resolve_resource_dir(const char *env_var, const char *subdir,
+                                 const char *sentinel, const char *baked) {
+  if (const char *env = getenv(env_var); env && env[0])
+    return env;
+  if (const char *base = SDL_GetBasePath(); base && base[0]) {
+    std::string dir = std::string(base) + subdir; // GetBasePath ends in a separator
+    if (FILE *probe = fopen((dir + "/" + sentinel).c_str(), "rb")) {
+      fclose(probe);
+      return dir;
+    }
+  }
+  return baked;
+}
+
 const char *font_dir() {
-  const char *env = getenv("SILENCER_LAUNCHER_FONT_DIR");
-  return (env && env[0]) ? env : LAUNCHER_FONT_DIR;
+  static const std::string dir = resolve_resource_dir(
+      "SILENCER_LAUNCHER_FONT_DIR", "fonts", "silencer-135.otf", LAUNCHER_FONT_DIR);
+  return dir.c_str();
 }
 
 const char *assets_dir() {
-  const char *env = getenv("SILENCER_LAUNCHER_ASSETS_DIR");
-  return (env && env[0]) ? env : LAUNCHER_ASSETS_DIR;
+  static const std::string dir = resolve_resource_dir(
+      "SILENCER_LAUNCHER_ASSETS_DIR", "assets", "PALETTE.BIN", LAUNCHER_ASSETS_DIR);
+  return dir.c_str();
+}
+
+// Where this launcher is installed, for the read-only SETTINGS row.
+// Report the .app itself on macOS — the only path a user recognizes, and the
+// thing they would move. SDL_GetBasePath resolves inside the bundle: to
+// Contents/Resources when the process is bundled (verified), and to the
+// executable's own dir otherwise, so trim either tail. SDL owns the returned
+// buffer; do not free it.
+std::string launcher_install_dir() {
+  const char *base = SDL_GetBasePath();
+  if (!base || !base[0])
+    return "";
+  std::string d = base;
+  while (d.size() > 1 && (d.back() == '/' || d.back() == '\\'))
+    d.pop_back();
+  for (const char *suffix : {"/Contents/Resources", "/Contents/MacOS"}) {
+    const size_t n = strlen(suffix);
+    if (d.size() > n && d.compare(d.size() - n, n, suffix) == 0) {
+      d.resize(d.size() - n);
+      break;
+    }
+  }
+  return d;
 }
 
 // The BROWSE... folder pick. SDL may run the dialog callback on another
@@ -273,6 +325,7 @@ int main(int, char **) {
   launcher::ViewModel vm;
   vm.snap = &snap;
   vm.intents = &intents;
+  vm.install_dir = launcher_install_dir();
 
   silencer::cppx_ui::PipelineHost host;
   {

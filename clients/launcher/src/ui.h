@@ -44,6 +44,9 @@ struct ViewModel {
   // wordmark. Native size travels with it so the topbar can hold the aspect.
   uint32_t logo_texture = 0;
   int logo_w = 0, logo_h = 0;
+  // Where the running launcher itself lives (SETTINGS tab, read-only). Comes
+  // from main() because it needs SDL_GetBasePath and this view stays SDL-free.
+  std::string install_dir;
 };
 
 extern ReactContext LauncherContext; // current = const ViewModel*

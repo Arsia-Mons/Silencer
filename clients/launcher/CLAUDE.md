@@ -3,7 +3,7 @@
 A standalone desktop launcher built on the **game client's own cppx
 retained UI engine + SDL3**. (It won the issue-#334 A/B against a
 Tauri prototype, since deleted.) Screens: topbar (WEBSITE/DISCORD links +
-lobby sign-in popover), a NEWS | RELEASES list/detail content panel, and
+lobby sign-in popover), a NEWS | RELEASES | SETTINGS content panel, and
 a playbar (lobby ping, channel drop-up with per-channel installs to
 `{base_dir}/{channel}`, split INSTALL/PLAY button). Its whole point is
 reuse: the hard parts (HTTPS download + progress + SHA-256 verify, zip
@@ -25,12 +25,18 @@ Data sources:
 - **Sign-in** — real TCP `opAuth` via the lobby SDK (auto-registers new
   usernames; the version handshake is skipped). Session handoff to the
   game and persisted auth are future phases — the game still prompts.
+- **Settings** — three read-only locations, nothing editable and nothing
+  else: where the launcher itself is installed (`SDL_GetBasePath`, trimmed
+  to the `.app` on macOS), the launcher's own `launcher.json`, and the
+  game's per-user data dir (`config.cfg`, `keybinds/`, `level/`, `replays/`,
+  palette caches). The one path the user *can* change — where games install
+  — stays in the channel drop-up, next to the control that acts on it.
 
 ## Layout
 
 | File | Owns |
 |---|---|
-| `src/config.{h,cpp}` | `launcher.json` load/save + defaults (per-channel installs). |
+| `src/config.{h,cpp}` | `launcher.json` load/save + defaults (per-channel installs), plus `game_data_dir()` for the SETTINGS tab. |
 | `src/net.{h,cpp}` | TCP-connect latency ping, detached process spawn, SHA-256 hex. |
 | `src/app.{h,cpp}` | `App`: config + a single background worker (manifest/news/releases fetch, ping, lobby auth, install/uninstall) + the snapshot the UI polls + intents. |
 | `src/ui.{h,cpp}` | Phosphor-green `::ui::Theme`, the `client::ui::UiScreen`, and the view components (composed from the reused `ui::components` primitives; per-session UI state lives in `RootView`'s fiber via `use_state`). |
@@ -69,25 +75,61 @@ MSVC `/Od` compiles them literally — measured 4–9× on the frame loop, enoug
 to drop a vsync'd 60fps to 30. `build-release/` (plain Release) exists for
 perf measurement.
 
-The binary is `build/SilencerLauncher` (macOS) / `build\silencer-launcher.exe`
-(Windows).
+The build output is `build/SilencerLauncher.app` (macOS — a real bundle, so
+the resources travel with the binary and codesigning has something to sign) /
+`build\silencer-launcher.exe` (Windows).
+
+The build **stages its own resources**: the five `shared/fonts/*.otf` faces and
+the 12 sprite banks `backgrounds.cpp` actually decodes (0–4, 7, 208 for
+backdrops and the logo; 132–136 for the glyph faces) are copied POST_BUILD into
+`Contents/Resources/{fonts,assets}` on macOS, or beside the `.exe` elsewhere.
+That is 6M of the 24M asset tree. Add a bank to `backgrounds.cpp` and you must
+add it to `LAUNCHER_SPR_BANKS` in `CMakeLists.txt`, or an installed copy loses
+that backdrop while your dev build keeps working.
 
 Yoga is reused offline from `clients/silencer/build*/_deps/yoga-src` when
 present (else shallow-cloned). `Python3` is required (cppx transpile).
 
+## Package (macOS)
+
+A fresh build links Homebrew SDL3/SDL3_ttf by absolute path, so it only runs
+where those exist. Make the bundle self-contained:
+
+```bash
+clients/launcher/package-macos.sh   # defaults to build/SilencerLauncher.app
+```
+
+It copies every non-system dylib into `Contents/Frameworks` (SDL3, SDL3_ttf and
+their transitive deps — freetype, harfbuzz, glib, graphite2, intl, pcre2,
+png16), rewrites the linkage to `@rpath`, adds the
+`@executable_path/../Frameworks` rpath, strips the duplicate literal `@rpath/`
+entry that newer dyld hard-aborts on, re-signs, and **fails the script** if any
+`/opt/homebrew` path survives. It mirrors
+`.github/actions/build-silencer-macos/action.yml`, which does the same for the
+game — keep the two in step.
+
+Still to do for a real release: a CI job, Developer ID signing, notarization,
+and a DMG. `release.yml` does all four for the game and is the template.
+
 ## Run
 
 ```bash
-clients/launcher/build/SilencerLauncher
+clients/launcher/build/SilencerLauncher.app/Contents/MacOS/SilencerLauncher
 ```
+
+Fonts and assets resolve through `resolve_resource_dir()` (main.cpp), in order:
+the env override below, then **beside the binary** via `SDL_GetBasePath()`
+(the bundle's `Contents/Resources` on macOS, the `.exe` dir elsewhere) probed
+with a sentinel file, then the compile-time source-tree path. An installed copy
+hits the second; a bare `build/` run hits the third.
 
 Env overrides (all optional):
 - `SILENCER_LAUNCHER_CONFIG=<path>` — use a different config file (default is
-  the shared contract path below). Handy for testing without clobbering it.
-- `SILENCER_LAUNCHER_FONT_DIR=<dir>` — UI `.otf` faces (default: baked-in
-  `shared/fonts`).
+  the per-OS path below). Handy for testing without clobbering it.
+- `SILENCER_LAUNCHER_FONT_DIR=<dir>` — UI `.otf` faces. Wins outright, even if
+  the dir is wrong, so a test can point at an empty dir and see the failure.
 - `SILENCER_LAUNCHER_ASSETS_DIR=<dir>` — game sprite assets for the backdrop
-  cycle (default: baked-in `shared/assets`). `src/backgrounds.cpp` decodes a
+  cycle. `src/backgrounds.cpp` decodes a
   curated set of screen-sized sprites (the bank 0–4 parallax backdrops with
   their junk bottom rows cropped, plus bank 007/208 menu screens) and shows
   one picked at random for the whole session; missing assets just mean a
@@ -97,8 +139,8 @@ Env overrides (all optional):
   in-flight install), write the frame to `<png>`, quit. This is the real
   render pipeline, so the PNG is exactly what the window shows.
 - `SILENCER_LAUNCHER_UI_STATE=<tokens>` — seed the UI state for shots:
-  comma-separated `releases`, `drop`, `auth`, `confirm`, `fontqa` (font QA
-  panel in place of the content panel).
+  comma-separated `releases`, `settings`, `drop`, `auth`, `confirm`, `fontqa`
+  (font QA panel in place of the content panel).
 - `SILENCER_LAUNCHER_SCRIPT=<steps>` — shot-mode input script: semicolon-
   separated `tab` / `backtab` / `click:x,y` / `dblclick:x,y` (logical 900×600
   coords) / `text:<utf8>` / `key:<name>[+shift|ctrl|alt|super]` (names: left,
@@ -139,7 +181,22 @@ SILENCER_LAUNCHER_CONFIG=/tmp/cfg.json SILENCER_LAUNCHER_SHOT=/tmp/shot.png \
 
 ## Config
 
-`~/.config/silencer-launcher/launcher.json`, keys: `channel`, `base_dir`,
+`launcher.json` in the per-OS app-data dir, mirroring the client's
+`GetDataDir()` rather than hardcoding one convention everywhere:
+
+| | Config dir (`launcher.json`) | Default `base_dir` (games) |
+|---|---|---|
+| macOS | `~/Library/Application Support/Silencer Launcher/` | `~/Applications/Silencer/` |
+| Windows | `%APPDATA%\Silencer Launcher\` | `%LOCALAPPDATA%\Programs\Silencer\` |
+| Linux | `~/.config/silencer-launcher/` | `~/.local/share/silencer-launcher/` |
+
+Games install to the per-user application dir, not inside the launcher's own
+config dir — on macOS `Silencer.app` then lands in `~/Applications`, where a
+user expects to find it. (Both paths were `~/.config` + `~/.local/share` on
+every OS while issue #334 needed one fixed contract the cppx and Tauri
+prototypes could share; Tauri is gone, so the contract went with it.)
+
+Keys: `channel`, `base_dir`,
 `installed_stable`, `installed_nightly`, `manifest_url_stable`,
 `manifest_url_nightly`, `announcements_url` (the shared/news v2 feed —
 production default `https://arsiamons.com/announcements.json`),
@@ -162,6 +219,22 @@ field falls back to its default instead of aborting the parse.
 - **`PipelineHost::ensure()` creates the `UiPipeline` lazily** — call it once
   before touching `host.pipeline()`, or you dereference a null `unique_ptr`.
   `main.cpp` does an initial `ensure()` before `set_frame_provider`/`push_screen`.
+- **Missing fonts are fatal, not a soft fallback.** `PipelineHost::ensure()`
+  fails outright if the font dir has no faces, and `main()` exits before a
+  window ever opens — verified by pointing `FONT_DIR` at an empty dir. Missing
+  *assets* degrade gracefully (plain fill, TTF text); missing *fonts* do not.
+  This is why the resource staging above exists: before it, the baked path was
+  an absolute path into the build machine's checkout, so any copied launcher
+  was dead on arrival.
+- **Re-sign AFTER the last `install_name_tool` edit, never before.** Every
+  rpath edit invalidates a Mach-O signature, and Apple Silicon SIGKILLs a
+  binary whose signature does not match its contents. The app dies with
+  **exit 137 and no message at all** — no dyld error, no crash log, nothing to
+  search for. `codesign -v` is the only thing that names the problem
+  ("invalid signature (code or signature have been modified)").
+  `package-macos.sh` therefore signs the dylibs and the bundle as its final
+  step; dylibbundler's own mid-run ad-hoc signing does not survive the rpath
+  dedupe that follows it.
 - **Text renders from the origin bitmap glyph atlases, not TTF.**
   `bake_glyph_faces` (backgrounds.cpp) decodes sprite banks 132–136 +
   `PALETTE.BIN` from the assets dir and bakes them into the host's
@@ -190,6 +263,30 @@ field falls back to its default instead of aborting the parse.
   sequence. `shutdown_` (atomic, because the curl thread doesn't hold `mtx_`)
   is set before the join and read by both progress callbacks. Any new
   `downloader_.Fetch` call must pass one of them, never `nullptr`.
+- **Displayed paths go through `display_path` (ui.cpp)**: backslashes to
+  forward slashes, trailing separator dropped. Not cosmetic — the atlas draws
+  `\` as a dash, so an un-normalized `C:\Users\me` reads as `C:-Users-me`, a
+  wrong path a user could copy down. Windows accepts forward slashes, so the
+  displayed path stays a real one. The channel drop-up's base_dir row does
+  **not** normalize yet and has the same bug on Windows.
+- **The game's data dir is mirrored, not reused.** `game_data_dir()`
+  (config.cpp) hand-copies the per-OS paths from `GetDataDir()` in
+  `clients/silencer/src/platform/os.cpp` — macOS `~/Library/Application
+  Support/Silencer/`, Windows `%APPDATA%/Silencer/`, else
+  `$HOME/.config/silencer/`. Compiling os.cpp in is not an option: it
+  includes the game's `shared.h`, far outside the launcher's dep closure,
+  and `GetDataDir()` *creates* the dir as a side effect — opening a settings
+  page must not conjure a data dir for someone who has never run the game.
+  Change one, change the other.
+- **`SDL_GetBasePath()` inside a macOS bundle returns
+  `<app>/Contents/Resources`, not `Contents/MacOS`** — verified by running a
+  staged bundle, not assumed. `launcher_install_dir()` (main.cpp) trims
+  either tail to report the `.app` itself. Test path changes from a real
+  bundle: copy the binary into `Foo.app/Contents/MacOS/` and shot from there.
+- **`detail_pane` needs a row wrapper.** It takes `height: 100%`, which only
+  resolves inside the flex row NEWS/RELEASES put it in. Dropped straight into
+  the content panel's column it overflows and pushes the playbar off the
+  window — `settings_content` wraps it in a `cols` box for that reason alone.
 - **Updater reuse is partial**: `updaterdownload` + `updatersha256` +
   `updaterzip` only. **Not** `updater.cpp`/`updaterstage2.cpp` — the launcher
   is plain extract-and-replace (the game isn't running). On macOS `updaterzip`
@@ -198,13 +295,30 @@ field falls back to its default instead of aborting the parse.
 ## Verify
 
 Configure + build, then run with `SILENCER_LAUNCHER_SHOT` and inspect the
-PNGs. Cover: the fresh state (news + INSTALL), `UI_STATE=releases,drop`
-(tabs + channel drop-up), `UI_STATE=auth` (sign-in form),
+PNGs. **Test packaging by copying `build/SilencerLauncher.app` somewhere
+outside the repo and running it from there** — the resource staging is
+invisible from a `build/` run, which happily falls back to the source tree.
+Confirm the `backgrounds: N loaded from ...` line names the bundle's own
+`Contents/Resources/assets`, not `shared/assets`. After `package-macos.sh`,
+prove the dylibs too — `DYLD_PRINT_LIBRARIES=1` must show SDL3 loading from the
+copy's own `Contents/Frameworks`, since `otool -L` alone only shows intent:
+
+```bash
+DYLD_PRINT_LIBRARIES=1 /path/to/copy/SilencerLauncher.app/Contents/MacOS/SilencerLauncher 2>&1 | grep SDL3
+``` Cover: the fresh state (news + INSTALL), `UI_STATE=releases,drop`
+(tabs + channel drop-up), `UI_STATE=settings` (paths panel — check the
+playbar is still on screen), `UI_STATE=auth` (sign-in form),
 `UI_STATE=confirm` (uninstall dialog), `TEST_INSTALL` against a loopback
 manifest+zip (ends in PLAY enabled), and `TEST_SIGNIN` against a local
 lobby (signed-in chip). Do not claim done on compile success alone.
 
 Gotcha while styling: the glyph atlases cover ASCII 33..126 only — keep
-UI strings ASCII (fold feed text via `fold_glyphs`), and never give
+UI strings ASCII (fold feed text via `fold_glyphs`) — and within that range
+several punctuation cells hold the **wrong glyph**. Verified by shooting
+`A\B/C-D_E|F~G^H`, which renders `A-B/C-D-EAFÃG-H`: `\` and `_` and `^` all
+draw a dash, `|` draws an A, `~` draws an Ã. Only `/` is right. Nothing warns
+you — the text just renders as a different, plausible string, so check any new
+punctuation in a shot before trusting it. This is why `display_path` exists.
+Also never give
 a full-window element a fully transparent background fill (the solid-fill
 fast path erases the frame beneath; use a real translucent wash).

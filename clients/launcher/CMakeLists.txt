@@ -168,6 +168,52 @@ target_compile_definitions(silencer-launcher PRIVATE
   LAUNCHER_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../shared/fonts"
   LAUNCHER_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../shared/assets")
 
+# --- Resource staging ---------------------------------------------------------
+# An installed launcher has no source tree, so the fonts and the sprite banks it
+# actually reads ship beside the binary: Contents/Resources inside the macOS
+# bundle, next to the executable elsewhere. resolve_resource_dir() in main.cpp
+# finds them through SDL_GetBasePath and falls back to the paths baked above
+# only when running straight out of build/.
+set(SHARED "${CMAKE_CURRENT_SOURCE_DIR}/../../shared")
+
+# Only the banks backgrounds.cpp decodes: 0-4 + 7 + 208 for the backdrops and
+# the logo, 132-136 for the glyph faces. The whole asset tree is 24M; this is 6M.
+set(LAUNCHER_SPR_BANKS 000 001 002 003 004 007 132 133 134 135 136 208)
+
 if(APPLE)
-  set_target_properties(silencer-launcher PROPERTIES OUTPUT_NAME "SilencerLauncher")
+  # A bundle, not a bare executable: it keeps the resources with the binary as
+  # one movable unit, and it is what codesigning and a DMG will need later.
+  set_target_properties(silencer-launcher PROPERTIES
+    MACOSX_BUNDLE TRUE
+    OUTPUT_NAME "SilencerLauncher"
+    MACOSX_BUNDLE_BUNDLE_NAME "Silencer Launcher"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.arsiamons.silencer.launcher")
+  set(LAUNCHER_RES_DIR "$<TARGET_BUNDLE_CONTENT_DIR:silencer-launcher>/Resources")
+else()
+  set(LAUNCHER_RES_DIR "$<TARGET_FILE_DIR:silencer-launcher>")
 endif()
+
+add_custom_command(TARGET silencer-launcher POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${LAUNCHER_RES_DIR}/fonts"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${LAUNCHER_RES_DIR}/assets/bin_spr"
+  VERBATIM)
+
+file(GLOB LAUNCHER_OTF "${SHARED}/fonts/*.otf")
+foreach(f ${LAUNCHER_OTF})
+  add_custom_command(TARGET silencer-launcher POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${f}" "${LAUNCHER_RES_DIR}/fonts/"
+    VERBATIM)
+endforeach()
+
+foreach(f BIN_SPR.DAT PALETTE.BIN)
+  add_custom_command(TARGET silencer-launcher POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SHARED}/assets/${f}"
+            "${LAUNCHER_RES_DIR}/assets/" VERBATIM)
+endforeach()
+
+foreach(b ${LAUNCHER_SPR_BANKS})
+  add_custom_command(TARGET silencer-launcher POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${SHARED}/assets/bin_spr/SPR_${b}.BIN" "${LAUNCHER_RES_DIR}/assets/bin_spr/"
+    VERBATIM)
+endforeach()

@@ -33,6 +33,19 @@ std::string home_dir() {
   return ".";
 }
 
+#ifdef _WIN32
+// %APPDATA% / %LOCALAPPDATA%, normalized to forward slashes: mkdir_p only
+// walks '/' to create intermediates, and os.cpp normalizes the same way.
+std::string win_dir(const char *var, const char *fallback_sub) {
+  const char *v = getenv(var);
+  std::string d = (v && v[0]) ? std::string(v) : home_dir() + fallback_sub;
+  for (char &c : d)
+    if (c == '\\')
+      c = '/';
+  return d;
+}
+#endif
+
 void mkdir_p(const std::string &path) {
   std::string cur;
   for (size_t i = 0; i < path.size(); ++i) {
@@ -54,7 +67,16 @@ std::string Config::dir_path() {
     size_t slash = p.find_last_of("/\\");
     return slash == std::string::npos ? std::string(".") : p.substr(0, slash);
   }
+  // Per-OS, mirroring GetDataDir() in clients/silencer/src/platform/os.cpp.
+  // The launcher gets its own folder beside the client's "Silencer" rather
+  // than writing into a directory the game owns.
+#ifdef _WIN32
+  return win_dir("APPDATA", "/AppData/Roaming") + "/Silencer Launcher";
+#elif defined(__APPLE__)
+  return home_dir() + "/Library/Application Support/Silencer Launcher";
+#else
   return home_dir() + "/.config/silencer-launcher";
+#endif
 }
 
 std::string Config::file_path() {
@@ -67,8 +89,17 @@ std::string Config::file_path() {
 void Config::apply_defaults() {
   if (channel != "nightly")
     channel = "stable";
+  // Games go where each OS puts per-user applications, not into the
+  // launcher's config dir — on macOS the installed Silencer.app then sits in
+  // ~/Applications, where a user expects to find and launch it.
   if (base_dir.empty())
+#ifdef _WIN32
+    base_dir = win_dir("LOCALAPPDATA", "/AppData/Local") + "/Programs/Silencer";
+#elif defined(__APPLE__)
+    base_dir = home_dir() + "/Applications/Silencer";
+#else
     base_dir = home_dir() + "/.local/share/silencer-launcher";
+#endif
   if (manifest_url_stable.empty())
     manifest_url_stable =
         "https://github.com/Arsia-Mons/Silencer/releases/latest/download/update.json";
@@ -173,6 +204,30 @@ const std::string &Config::installed(const std::string &ch) const {
 
 void Config::set_installed(const std::string &ch, const std::string &version) {
   (ch == "nightly" ? installed_nightly : installed_stable) = version;
+}
+
+std::string game_data_dir() {
+#ifdef _WIN32
+  const char *appdata = getenv("APPDATA");
+  if (!appdata || !appdata[0])
+    return "";
+  std::string d = std::string(appdata) + "/Silencer/";
+  // os.cpp normalizes separators so concatenations stay uniform.
+  for (char &c : d)
+    if (c == '\\')
+      c = '/';
+  return d;
+#elif defined(__APPLE__)
+  const char *home = getenv("HOME");
+  if (!home || !home[0])
+    return "";
+  return std::string(home) + "/Library/Application Support/Silencer/";
+#else
+  const char *home = getenv("HOME");
+  if (!home || !home[0])
+    return "";
+  return std::string(home) + "/.config/silencer/";
+#endif
 }
 
 } // namespace launcher

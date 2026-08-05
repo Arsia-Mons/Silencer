@@ -82,6 +82,9 @@ constexpr uint16_t kFaceHeading = 2;
 // 900 window − 36 root pad − 32 panel pad − 220 list − 12 gap − 28 detail pad
 // − ~22 scrollbar/track.
 constexpr float kDetailTextW = 550.0f;
+// SETTINGS pane: one full-width column, no list beside it.
+// 900 window − 36 root pad − 32 panel pad − 28 pane pad − ~22 scrollbar/track.
+constexpr float kSettingsTextW = 780.0f;
 constexpr float kListTextW = 168.0f;
 // Channel drop-up: popover width and the wrap widths inside it (popover pad
 // 12 each side; channel rows pad another 12).
@@ -272,7 +275,7 @@ UiElement small_button(const char *key, const char *text, Color color,
 
 // ---- Per-session UI state (held in RootView's fiber) -----------------------
 struct UiState {
-  int tab = 0; // 0 = news, 1 = releases
+  int tab = 0; // 0 = news, 1 = releases, 2 = settings
   int sel_news = 0;
   int sel_release = 0;
   bool drop_open = false;
@@ -297,6 +300,8 @@ UiState initial_ui_state() {
   std::string s = env;
   if (s.find("releases") != std::string::npos)
     st.tab = 1;
+  if (s.find("settings") != std::string::npos)
+    st.tab = 2;
   if (s.find("drop") != std::string::npos)
     st.drop_open = true;
   if (s.find("auth") != std::string::npos)
@@ -602,6 +607,68 @@ UiElement releases_content(const AppSnapshot &s, UiState *st) {
   return MkBox(cols);
 }
 
+// ---- SETTINGS tab -----------------------------------------------------------
+// Read-only locations only. Nothing here is editable: the launcher's install
+// dir cannot be changed after the fact, and the two file locations are fixed
+// per-OS contracts. The one path the user *can* change — where games install —
+// stays in the channel drop-up next to the control that acts on it.
+// Paths come from three sources with three conventions (SDL hands back
+// backslashes on Windows, os.cpp normalizes to forward slashes, some carry a
+// trailing separator). Settle them so the panel reads uniformly — and so no
+// path reaches the glyph atlas holding a backslash, whose cell in the origin
+// bank draws a DASH. `C:\Users\me` would render as `C:-Users-me`: not merely
+// ugly, but a plausible wrong path someone could copy down. Windows file APIs
+// take forward slashes, so this stays a true path, not just a readable one.
+std::string display_path(std::string p) {
+  for (char &c : p)
+    if (c == '\\')
+      c = '/';
+  while (p.size() > 1 && p.back() == '/')
+    p.pop_back();
+  return p;
+}
+
+UiElement path_row(const std::string &keybase, const std::string &name,
+                   const std::string &path) {
+  BoxProps b{};
+  b.key = dup(keybase);
+  b.layout = col(3);
+  b.layout.width = Length::percent(100.0f);
+  // The full path, wrapped — a truncated path tells the user nothing.
+  b.children = ::ui::children(
+      {label(dup(keybase + "-n"), name, kTextFaint, 11, kFaceBody),
+       label(dup(keybase + "-p"), path.empty() ? "Unavailable" : display_path(path),
+             path.empty() ? kOffline : kText, 11, kFaceBody, TextAlign::Left,
+             ::ui::TextWrap::Words, Length::points(kSettingsTextW))});
+  return MkBox(b);
+}
+
+UiElement settings_content(const std::string &install_dir) {
+  std::vector<UiElement> kids;
+
+  kids.push_back(label("set-h1", "LAUNCHER", kAccent, 19, kFaceHeading));
+  kids.push_back(path_row("set-install", "INSTALL LOCATION", install_dir));
+  kids.push_back(path_row("set-cfg", "SETTINGS FILE", Config::file_path()));
+
+  kids.push_back(divider("set-div"));
+
+  kids.push_back(label("set-h2", "GAME", kAccent, 19, kFaceHeading));
+  kids.push_back(path_row("set-gamedata", "SETTINGS FOLDER", game_data_dir()));
+
+  // detail_pane is sized for the row wrapper NEWS/RELEASES put it in (it takes
+  // `height: 100%` of a definite parent). Dropped straight into the panel's
+  // column it overflows and pushes the playbar off the window, so give it the
+  // same wrapper even though there is no list column beside it.
+  BoxProps cols{};
+  cols.key = "set-cols";
+  cols.layout = row(0);
+  cols.layout.align_items = AlignItems::Stretch;
+  cols.layout.width = Length::percent(100.0f);
+  cols.layout.flex_grow = 1.0f;
+  cols.children = ::ui::children({detail_pane("set-pane", std::move(kids))});
+  return MkBox(cols);
+}
+
 // ---- Font QA specimen (SILENCER_LAUNCHER_UI_STATE=fontqa) -------------------
 // Every glyph face at a ramp of sizes, labeled, for style QA.
 // "*" marks integer multiples of the face's native line height (pixel-perfect
@@ -674,7 +741,8 @@ UiElement font_qa_panel() {
 }
 
 // ---- Content panel (tabs) ---------------------------------------------------
-UiElement content_panel(const AppSnapshot &s, const Intents &in, UiState *st) {
+UiElement content_panel(const AppSnapshot &s, const Intents &in, UiState *st,
+                        const std::string &install_dir) {
   auto tab = [&](const char *key, const char *text, int idx) {
     ButtonProps b{};
     b.key = key;
@@ -693,7 +761,8 @@ UiElement content_panel(const AppSnapshot &s, const Intents &in, UiState *st) {
   tabs.layout = row(8);
   tabs.layout.width = Length::percent(100.0f);
   std::vector<UiElement> tab_kids = {tab("tab-news", "NEWS", 0),
-                                     tab("tab-releases", "RELEASES", 1), spacer("tabs-gap")};
+                                     tab("tab-releases", "RELEASES", 1),
+                                     tab("tab-settings", "SETTINGS", 2), spacer("tabs-gap")};
   if (st->tab == 1) {
     std::string chlabel = s.channel == "nightly" ? "NIGHTLY" : "STABLE";
     tab_kids.push_back(label("tabs-ch", chlabel, kTextFaint, 11, kFaceBody));
@@ -708,8 +777,10 @@ UiElement content_panel(const AppSnapshot &s, const Intents &in, UiState *st) {
   panel.layout.padding = EdgeSizes{16, 16, 14, 14};
   panel.layout.overflow = ::ui::Overflow::Hidden;
   panel.style = panel_style(kPanel, kBorder, 4.0f);
-  panel.children = ::ui::children(
-      {MkBox(tabs), st->tab == 0 ? news_content(s, in, st) : releases_content(s, st)});
+  UiElement body = st->tab == 0   ? news_content(s, in, st)
+                   : st->tab == 1 ? releases_content(s, st)
+                                  : settings_content(install_dir);
+  panel.children = ::ui::children({MkBox(tabs), std::move(body)});
   return MkBox(panel);
 }
 
@@ -1311,7 +1382,7 @@ UiElement RootView(const RootProps &) {
 
   std::vector<UiElement> kids;
   kids.push_back(top_bar(s, in, st));
-  kids.push_back(st->font_qa ? font_qa_panel() : content_panel(s, in, st));
+  kids.push_back(st->font_qa ? font_qa_panel() : content_panel(s, in, st, vm.install_dir));
   kids.push_back(play_bar(s, in, st));
 
   if (st->drop_open || st->auth_open)
