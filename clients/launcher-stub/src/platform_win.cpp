@@ -142,7 +142,15 @@ stub::HttpResult http_fetch(const std::string &url, int timeout_ms, FILE *out_fi
   }
   uint64_t got = 0;
   std::vector<char> buf(64 * 1024);
+  const ULONGLONG start = GetTickCount64();
   while (ok) {
+    // WinHttpSetTimeouts only bounds each stage/read, so a trickling server
+    // would keep the loop alive forever; enforce the total deadline here.
+    if (timeout_ms > 0 && GetTickCount64() - start > (ULONGLONG)timeout_ms) {
+      ok = false;
+      res.error = "timed out";
+      break;
+    }
     DWORD n = 0;
     if (!WinHttpReadData(req, buf.data(), (DWORD)buf.size(), &n)) {
       ok = false;
@@ -151,8 +159,14 @@ stub::HttpResult http_fetch(const std::string &url, int timeout_ms, FILE *out_fi
     }
     if (n == 0)
       break;
-    if (out_mem)
+    if (out_mem) {
       out_mem->append(buf.data(), n);
+      if (out_mem->size() > 1024 * 1024) {
+        ok = false;
+        res.error = "response too large";
+        break;
+      }
+    }
     if (out_file && fwrite(buf.data(), 1, n, out_file) != n) {
       ok = false;
       res.error = "write failed";
@@ -177,9 +191,9 @@ stub::HttpResult http_fetch(const std::string &url, int timeout_ms, FILE *out_fi
 } // namespace
 
 stub::HttpResult stub::http_get_text(const std::string &url, int timeout_ms,
-                                     std::string *out) {
+                                     std::string *out, const DlProgress &progress) {
   out->clear();
-  return http_fetch(url, timeout_ms, nullptr, out, {});
+  return http_fetch(url, timeout_ms, nullptr, out, progress);
 }
 
 stub::HttpResult stub::http_download(const std::string &url, const std::string &dest,
@@ -288,7 +302,8 @@ bool stub::spawn(const std::string &exe, const std::string &workdir, Child *out)
   return true;
 }
 
-int stub::try_wait(const Child &c, int timeout_ms) {
+int stub::try_wait(const Child &c, int timeout_ms, bool *exited) {
+  *exited = false;
   if (!c.valid())
     return -1;
   HANDLE h = (HANDLE)c.handle;
@@ -296,7 +311,8 @@ int stub::try_wait(const Child &c, int timeout_ms) {
     return -1;
   DWORD code = 0;
   GetExitCodeProcess(h, &code);
-  return (int)code;
+  *exited = true;
+  return (int)code; // crash exits are negative NTSTATUS values - still nonzero
 }
 
 bool stub::run_tool(const std::vector<std::string> &argv) {

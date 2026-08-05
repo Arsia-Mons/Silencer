@@ -125,16 +125,27 @@ assert_absent() { # <desc> <path>
   else echo "  FAIL: $1 - $2 exists"; FAILED=1; fi
 }
 
-# --- server up before anything drives the stub (the #341/#342 lesson) ---
+# --- server up before anything drives the stub (the #341/#342 lesson);
+#     retry on a fresh port if the random one is taken ---
+start_server() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    PORT=$(( (RANDOM % 20000) + 20000 ))
+    bun "$HERE/serve.ts" "$(native "$WWW")" "$PORT" &
+    SERVER_PID=$!
+    for _ in $(seq 1 30); do
+      curl -fsS "http://127.0.0.1:$PORT/manifest.json" >/dev/null 2>&1 && return 0
+      kill -0 "$SERVER_PID" 2>/dev/null || break
+      sleep 0.1
+    done
+    kill "$SERVER_PID" 2>/dev/null
+    wait "$SERVER_PID" 2>/dev/null
+    SERVER_PID=""
+  done
+  return 1
+}
 write_manifest 00000
-bun "$HERE/serve.ts" "$(native "$WWW")" "$PORT" &
-SERVER_PID=$!
-for _ in $(seq 1 50); do
-  curl -fsS "http://127.0.0.1:$PORT/manifest.json" >/dev/null 2>&1 && break
-  sleep 0.1
-done
-curl -fsS "http://127.0.0.1:$PORT/manifest.json" >/dev/null 2>&1 || {
-  echo "server never came up"; exit 1; }
+start_server || { echo "server never came up"; exit 1; }
 
 echo "=== case: up to date - no download, current version runs"
 S="$TMP/s-uptodate"
@@ -197,6 +208,21 @@ write_manifest 00002 "$TMP/v2bad.$ARCHIVE_EXT"
 reset_out
 run_stub "$S"; sleep 1
 assert_eq "bad version ran then previous relaunched" "00002 00001" "$(ran)"
+assert_eq "current rolled back" "00001" "$(cur "$S")"
+
+echo "=== case: rollback on crash - a crash exit code also triggers rollback"
+# On Windows this exits with a negative NTSTATUS-style code (0xC0000005);
+# on POSIX it truncates to a nonzero byte. Both must roll back.
+S="$TMP/s-rollcrash"
+make_version "$S/00001" 00001
+echo 00001 > "$S/current.txt"
+V2C="$TMP/v2crash"
+make_version "$V2C" 00002 -1073741819
+make_archive "$V2C" "$TMP/v2crash.$ARCHIVE_EXT"
+write_manifest 00002 "$TMP/v2crash.$ARCHIVE_EXT"
+reset_out
+run_stub "$S"; sleep 1
+assert_eq "crashing version ran then previous relaunched" "00002 00001" "$(ran)"
 assert_eq "current rolled back" "00001" "$(cur "$S")"
 
 echo "=== case: first run - empty store bootstraps from the manifest"

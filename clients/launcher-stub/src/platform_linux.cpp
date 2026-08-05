@@ -57,10 +57,9 @@ void stub::error_box(const std::string &msg) {
   logf("%s", msg.c_str());
   if (env_str("SILENCER_STUB_NO_GUI") == "1")
     return;
-  // Message text is ours (no quotes); best-effort dialog, stderr already has it.
-  std::string cmd =
-      "zenity --error --title='Silencer Launcher' --text='" + msg + "' 2>/dev/null";
-  (void)system(cmd.c_str());
+  // argv form, no shell: message content can never become shell input.
+  (void)run_tool({"zenity", "--error", "--title=Silencer Launcher",
+                  "--text=" + msg});
 }
 
 bool stub::verify_payload(const std::string &) {

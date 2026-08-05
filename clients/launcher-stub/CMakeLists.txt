@@ -16,6 +16,11 @@ if(WIN32)
   list(APPEND STUB_SOURCES src/platform_win.cpp src/stub.manifest)
 elseif(APPLE)
   enable_language(OBJCXX)
+  # CMAKE_CXX_STANDARD does not apply to OBJCXX; without this the .mm
+  # compiles at the toolchain default, which is <17 on older AppleClang and
+  # then <filesystem> hard-fails.
+  set(CMAKE_OBJCXX_STANDARD 17)
+  set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
   list(APPEND STUB_SOURCES src/platform_posix.cpp src/platform_mac.mm)
 else()
   list(APPEND STUB_SOURCES src/platform_posix.cpp src/platform_linux.cpp)

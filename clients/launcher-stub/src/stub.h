@@ -41,8 +41,10 @@ struct HttpResult {
   bool ok = false;
   std::string error;
 };
-// Small-body GET into memory. timeout_ms bounds each request stage.
-HttpResult http_get_text(const std::string &url, int timeout_ms, std::string *out);
+// Small-body GET into memory (capped at 1 MB). timeout_ms bounds the whole
+// request. progress (ignores its byte arguments) returning false aborts.
+HttpResult http_get_text(const std::string &url, int timeout_ms, std::string *out,
+                         const std::function<bool(uint64_t, uint64_t)> &progress = {});
 // Large download to a file. progress returning false aborts (cancel).
 // No total timeout; a ~30s stall aborts.
 using DlProgress = std::function<bool(uint64_t got, uint64_t total)>;
@@ -55,8 +57,10 @@ struct Child {
   bool valid() const { return handle != 0; }
 };
 bool spawn(const std::string &exe, const std::string &workdir, Child *out);
-// Exit code if the child exited within timeout_ms, else -1.
-int try_wait(const Child &c, int timeout_ms);
+// If the child exited within timeout_ms: *exited = true, returns the raw
+// exit status (which on Windows can be a negative NTSTATUS crash code -
+// treat anything nonzero as failure). Still running: *exited = false.
+int try_wait(const Child &c, int timeout_ms, bool *exited);
 // Run a helper to completion, no visible window. argv[0] is the program.
 bool run_tool(const std::vector<std::string> &argv);
 

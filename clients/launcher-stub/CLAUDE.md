@@ -23,8 +23,11 @@ Payload versions live in `<store>/<build_id>/`; `current.txt` names the
 one that runs. An update stages next to the live version and the atomic
 `current.txt` flip is the **only commit point** — server down, partial
 download, bad checksum, failed extract all leave the working install
-untouched. A freshly-updated payload that exits nonzero within ~5s is
-rolled back to `previous.txt` automatically. `main.cpp` owns this flow;
+untouched. A freshly-updated payload that exits nonzero within ~5s —
+including Windows crash codes, which are *negative* NTSTATUS values, so
+never test `rc > 0` — is rolled back automatically. Launch tries
+`current.txt` → `previous.txt` → the seed payload, whichever spawns
+first. `main.cpp` owns this flow;
 platform files only implement the `stub.h` interface (HTTP, GUI,
 processes, signature check). Store location: `<exe dir>/versions` when
 writable, else the per-user data dir; always the per-user dir on macOS
@@ -98,6 +101,14 @@ defaulting to the GitHub `update-launcher.json`.
 - The stub closes its window ~300ms after spawning the payload so
   there's no gap between the two windows (no dead air, and no window
   overlap either).
+- **The worker thread has exception barriers** (`stub_main`): an
+  escaping exception would `std::terminate` before anything launches.
+  New code in the update path either uses `std::error_code` overloads
+  or stays inside those barriers.
+- **macOS extracts before it codesign-verifies** (it has to — the check
+  runs on the extracted bundle). Zip-slip protection during that
+  extract rests on `ditto`; phase 2's mac e2e must include a hostile
+  archive (`../evil` entry) before the macOS path ships.
 
 ## Not wired up yet (phases 2–4 on #347)
 

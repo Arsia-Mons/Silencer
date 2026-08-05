@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <thread>
 
@@ -166,9 +167,16 @@ bool url_allowed(const std::string &url) {
   if (url.rfind("http://", 0) != 0)
     return false;
   std::string host = url.substr(7);
-  size_t cut = host.find_first_of(":/");
-  if (cut != std::string::npos)
-    host = host.substr(0, cut);
+  if (!host.empty() && host[0] == '[') { // bracketed IPv6 literal
+    size_t close = host.find(']');
+    if (close == std::string::npos)
+      return false;
+    host = host.substr(0, close + 1);
+  } else {
+    size_t cut = host.find_first_of(":/");
+    if (cut != std::string::npos)
+      host = host.substr(0, cut);
+  }
   return host == "localhost" || host == "127.0.0.1" || host == "[::1]";
 }
 
@@ -211,15 +219,19 @@ bool extract_archive(const fs::path &archive, const fs::path &into) {
 }
 
 void prune(const Store &store, const std::string &keep1, const std::string &keep2) {
-  std::error_code ec;
-  for (auto &e : fs::directory_iterator(store.root, ec)) {
-    if (!e.is_directory())
-      continue;
-    std::string name = e.path().filename().u8string();
-    if (name == keep1 || name == keep2 || name == "staging")
-      continue;
-    std::error_code ec2;
-    fs::remove_all(e.path(), ec2);
+  try {
+    std::error_code ec;
+    for (auto &e : fs::directory_iterator(store.root, ec)) {
+      if (!e.is_directory(ec))
+        continue;
+      std::string name = e.path().filename().u8string();
+      if (name == keep1 || name == keep2 || name == "staging")
+        continue;
+      std::error_code ec2;
+      fs::remove_all(e.path(), ec2);
+    }
+  } catch (...) {
+    // best-effort housekeeping; iteration errors must not unwind the update
   }
 }
 
@@ -240,7 +252,8 @@ Fresh try_update(stub::GuiState &st, const Store &store, const std::string &cur)
     return fresh;
   }
   std::string body;
-  stub::HttpResult r = stub::http_get_text(url, 3000, &body);
+  stub::HttpResult r = stub::http_get_text(
+      url, 3000, &body, [&](uint64_t, uint64_t) { return !st.cancel.load(); });
   if (!r.ok) {
     stub::logf("manifest fetch failed: %s", r.error.c_str());
     return fresh;
@@ -306,7 +319,7 @@ Fresh try_update(stub::GuiState &st, const Store &store, const std::string &cur)
     cleanup();
     return fresh;
   }
-  if (!fs::exists(x / P(kPayloadRel))) {
+  if (!fs::exists(x / P(kPayloadRel), ec)) {
     stub::logf("payload executable missing from the archive");
     cleanup();
     return fresh;
@@ -340,27 +353,39 @@ struct Launched {
   bool ok = false;
 };
 
-Launched launch_version(const Store &store, const std::string &id) {
+Launched launch_at(const fs::path &dir) {
   Launched l;
-  fs::path dir, exe;
-  if (!id.empty()) {
-    dir = store.version_dir(id);
-    exe = dir / P(kPayloadRel);
-  }
-  if (id.empty() || !fs::exists(exe)) {
-    // The seed payload shipped beside the stub (first run, or a wiped store).
-#ifdef __APPLE__
-    dir = exe_dir().parent_path() / "Resources/payload";
-#else
-    dir = exe_dir() / "payload";
-#endif
-    exe = dir / P(kPayloadRel);
-  }
-  if (!fs::exists(exe))
+  fs::path exe = dir / P(kPayloadRel);
+  std::error_code ec;
+  if (!fs::exists(exe, ec))
     return l;
   stub::logf("launching %s", S(exe).c_str());
   l.ok = stub::spawn(S(exe), S(dir), &l.child);
   return l;
+}
+
+// Try the named version, then previous.txt, then the seed payload shipped
+// beside the stub - whatever launches first.
+Launched launch_version(const Store &store, const std::string &id) {
+  if (!id.empty()) {
+    Launched l = launch_at(store.version_dir(id));
+    if (l.ok)
+      return l;
+  }
+  std::string prev = read_line(store.previous_file());
+  if (!prev.empty() && prev != id) {
+    Launched l = launch_at(store.version_dir(prev));
+    if (l.ok) {
+      stub::logf("fell back to previous version %s", prev.c_str());
+      return l;
+    }
+  }
+#ifdef __APPLE__
+  fs::path seed = exe_dir().parent_path() / "Resources/payload";
+#else
+  fs::path seed = exe_dir() / "payload";
+#endif
+  return launch_at(seed);
 }
 
 } // namespace
@@ -371,6 +396,8 @@ void stub::logf(const char *fmt, ...) {
   va_start(ap, fmt);
   vsnprintf(buf, sizeof buf, fmt, ap);
   va_end(ap);
+  static std::mutex mtx; // worker and GUI threads both log
+  std::lock_guard<std::mutex> lk(mtx);
   fprintf(stderr, "[stub] %s\n", buf);
   if (g_log.is_open()) {
     g_log << buf << "\n";
@@ -389,15 +416,31 @@ int stub_main() {
   Fresh fresh;
   Launched launched;
   std::thread worker([&] {
-    const std::string cur = read_line(store.current_file());
-    fresh = try_update(st, store, cur);
-    launched = launch_version(store, read_line(store.current_file()));
-    if (!launched.ok && fresh.applied) {
-      // The new payload can't even spawn - roll back immediately.
-      stub::logf("rollback: spawn failed for %s", fresh.id.c_str());
-      write_atomic(store.current_file(), fresh.prev);
-      launched = launch_version(store, fresh.prev);
-      fresh.applied = false;
+    // Exception barriers: an escaping exception would std::terminate the
+    // stub before anything launches - the exact contract violation this
+    // component exists to prevent. Whatever the update did, always fall
+    // through to launching something.
+    try {
+      const std::string cur = read_line(store.current_file());
+      fresh = try_update(st, store, cur);
+    } catch (const std::exception &e) {
+      stub::logf("update failed with exception: %s", e.what());
+    } catch (...) {
+      stub::logf("update failed with exception");
+    }
+    try {
+      launched = launch_version(store, read_line(store.current_file()));
+      if (!launched.ok && fresh.applied) {
+        // The new payload can't even spawn - roll back immediately.
+        stub::logf("rollback: spawn failed for %s", fresh.id.c_str());
+        write_atomic(store.current_file(), fresh.prev);
+        launched = launch_version(store, fresh.prev);
+        fresh.applied = false;
+      }
+    } catch (const std::exception &e) {
+      stub::logf("launch failed with exception: %s", e.what());
+    } catch (...) {
+      stub::logf("launch failed with exception");
     }
     if (launched.ok) {
       // Give the payload a beat to get its window up before ours closes.
@@ -414,9 +457,11 @@ int stub_main() {
     return 1;
   }
   if (fresh.applied) {
-    // A freshly-updated payload that dies right away gets rolled back.
-    int rc = stub::try_wait(launched.child, 5000);
-    if (rc > 0) {
+    // A freshly-updated payload that dies right away - clean nonzero exit
+    // OR a crash (negative NTSTATUS on Windows) - gets rolled back.
+    bool exited = false;
+    int rc = stub::try_wait(launched.child, 5000, &exited);
+    if (exited && rc != 0) {
       stub::logf("rollback: %s exited with %d right after updating",
                  fresh.id.c_str(), rc);
       write_atomic(store.current_file(), fresh.prev);

@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <climits>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -71,7 +72,8 @@ bool stub::spawn(const std::string &exe, const std::string &workdir, Child *out)
   return true;
 }
 
-int stub::try_wait(const Child &c, int timeout_ms) {
+int stub::try_wait(const Child &c, int timeout_ms, bool *exited) {
+  *exited = false;
   if (!c.valid())
     return -1;
   pid_t pid = (pid_t)c.handle;
@@ -79,6 +81,7 @@ int stub::try_wait(const Child &c, int timeout_ms) {
     int status = 0;
     pid_t r = waitpid(pid, &status, WNOHANG);
     if (r == pid) {
+      *exited = true;
       if (WIFEXITED(status))
         return WEXITSTATUS(status);
       if (WIFSIGNALED(status))
@@ -116,9 +119,11 @@ constexpr long kOptFailOnError = 45;
 constexpr long kOptFollowLocation = 52;
 constexpr long kOptTimeoutMs = 155;
 constexpr long kOptConnectTimeoutMs = 156;
+constexpr long kOptRedirProtocols = 182;
 constexpr long kOptWriteFunction = 20011;
 constexpr long kOptXferInfoFunction = 20219;
 constexpr long kOptXferInfoData = 10057;
+constexpr long kProtoHttps = 2; // CURLPROTO_HTTPS
 
 struct Curl {
   void *lib = nullptr;
@@ -160,13 +165,19 @@ struct Xfer {
   std::string *mem = nullptr;
   const stub::DlProgress *progress = nullptr;
   bool write_failed = false;
+  bool too_large = false;
 };
 
 size_t write_cb(char *ptr, size_t size, size_t nmemb, void *ud) {
   Xfer *x = (Xfer *)ud;
   size_t n = size * nmemb;
-  if (x->mem)
+  if (x->mem) {
+    if (x->mem->size() + n > 1024 * 1024) {
+      x->too_large = true;
+      return 0;
+    }
     x->mem->append(ptr, n);
+  }
   if (x->file && fwrite(ptr, 1, n, x->file) != n) {
     x->write_failed = true;
     return 0;
@@ -183,6 +194,9 @@ int xferinfo_cb(void *ud, long long dltotal, long long dlnow, long long, long lo
 
 stub::HttpResult fetch(const std::string &url, int timeout_ms, Xfer &x) {
   stub::HttpResult res;
+  // Old libcurls can raise SIGPIPE on a peer reset mid-write; a signal must
+  // never kill the stub before it launches the payload.
+  signal(SIGPIPE, SIG_IGN);
   Curl &c = curl();
   if (!c.ok()) {
     res.error = "libcurl unavailable";
@@ -195,6 +209,10 @@ stub::HttpResult fetch(const std::string &url, int timeout_ms, Xfer &x) {
   }
   c.easy_setopt(h, kOptUrl, url.c_str());
   c.easy_setopt(h, kOptFollowLocation, 1L);
+  // Redirects may only go to https - WinHTTP refuses https->http downgrades
+  // by default, this is the libcurl equivalent. (The initial URL is already
+  // allowlisted by the caller; loopback http never redirects in our setups.)
+  c.easy_setopt(h, kOptRedirProtocols, kProtoHttps);
   c.easy_setopt(h, kOptFailOnError, 1L);
   c.easy_setopt(h, kOptUserAgent, "silencer-launcher-stub");
   c.easy_setopt(h, kOptWriteFunction, (void *)write_cb);
@@ -217,7 +235,10 @@ stub::HttpResult fetch(const std::string &url, int timeout_ms, Xfer &x) {
                                 : "curl error " + std::to_string(rc);
   else
     res.ok = true;
-  if (x.write_failed) {
+  if (x.too_large) {
+    res.ok = false;
+    res.error = "response too large";
+  } else if (x.write_failed) {
     res.ok = false;
     res.error = "write failed";
   }
@@ -228,10 +249,12 @@ stub::HttpResult fetch(const std::string &url, int timeout_ms, Xfer &x) {
 } // namespace
 
 stub::HttpResult stub::http_get_text(const std::string &url, int timeout_ms,
-                                     std::string *out) {
+                                     std::string *out, const DlProgress &progress) {
   out->clear();
   Xfer x;
   x.mem = out;
+  if (progress)
+    x.progress = &progress;
   return fetch(url, timeout_ms, x);
 }
 
