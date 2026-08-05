@@ -151,13 +151,35 @@ OLD_BIN="$(stage_install "$OLD_BUILD_DIR" "$INSTALL_DIR")"
 echo "OLD binary: $OLD_BIN"
 
 HTTP_PORT="$(pick_port)"
+HTTP_LOG="$WORK/http.log"
 echo "=== HTTP server on :$HTTP_PORT serving $HOST_DIR ==="
-( cd "$HOST_DIR" && python3 -m http.server "$HTTP_PORT" >/dev/null 2>&1 ) &
+( cd "$HOST_DIR" && python3 -m http.server "$HTTP_PORT" >"$HTTP_LOG" 2>&1 ) &
 HTTP_PID=$!
 
 CTRL_P="$(pick_port)"   # OLD client, driven by us (flag)
 CTRL_Q="$(pick_port)"   # relaunched NEW client, observed by us (env)
 URL="http://127.0.0.1:$HTTP_PORT/$ZIP_NAME"
+
+# The server has to be ANSWERING before the client is told to download from it.
+# Nothing waited before: the script started python and drove the update ~2s
+# later. That race is won on a dev Mac (the server answers in ~200ms) and lost
+# on the CI runner, where the client got a port nothing served yet and reported
+# `curl=28`, which reads as a broken self-updater instead of a harness that
+# jumped the gun (issue #341). Its own log is kept for the same reason — it
+# went to /dev/null, so python's failure to start left no trace anywhere.
+echo "=== waiting for the HTTP server to answer ==="
+SERVED=0
+for _ in $(seq 1 300); do
+  if curl -fs -o /dev/null --max-time 2 "$URL" 2>/dev/null; then SERVED=1; break; fi
+  kill -0 "$HTTP_PID" >/dev/null 2>&1 || break
+  sleep 0.1
+done
+if [ "$SERVED" != 1 ]; then
+  echo "FAIL: the test's own HTTP server never served $URL — this is the harness, not the updater" >&2
+  echo "--- http server log ---" >&2; cat "$HTTP_LOG" >&2 || true
+  exit 1
+fi
+echo "HTTP server is serving $URL"
 OLD_LOG="$WORK/old.log"
 
 echo "=== launching OLD client (drive-port=$CTRL_P, relaunch-env-port=$CTRL_Q) ==="
@@ -183,7 +205,9 @@ echo "=== waiting for OLD client to exit (stage-2 spawned) ==="
 for _ in $(seq 1 120); do kill -0 "$OLD_PID" >/dev/null 2>&1 || break; sleep 0.5; done
 if kill -0 "$OLD_PID" >/dev/null 2>&1; then
   echo "FAIL: OLD client did not exit — stage-2 handoff never happened" >&2
-  tail -30 "$OLD_LOG" >&2; exit 1
+  echo "--- OLD client log (tail) ---" >&2; tail -30 "$OLD_LOG" >&2
+  echo "--- http server log (tail) ---" >&2; tail -10 "$HTTP_LOG" >&2 || true
+  exit 1
 fi
 OLD_PID=""
 echo "OLD client exited; awaiting auto-relaunched NEW client on :$CTRL_Q"
