@@ -8,6 +8,10 @@ name: Debug loopback
 
 on:
   workflow_dispatch:
+  # `workflow_dispatch` only resolves against the default branch, so a
+  # branch-only diagnostic has to trigger on its own push.
+  push:
+    branches: [fix/issue-341-updater-e2e-loopback]
 
 jobs:
   macos:
