@@ -7,9 +7,10 @@
 #
 # Defaults describe the game bundle, so the one-argument call is unchanged.
 # The launcher passes its own exe name (which contains a space — quote it) and
-# an empty helper path, because it has no nested helper binary:
+# keeps the defaulted helper path, since it ships the same nested stage-2
+# helper for its own self-update:
 #
-#   check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher" ""
+#   check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher"
 set -euo pipefail
 
 APP="${1:?usage: $0 <app> [exe-name] [helper-relpath]}"

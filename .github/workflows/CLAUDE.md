@@ -127,14 +127,15 @@ and needs `oven-sh/setup-bun` (the harness drives the game via `clients/cli`).
 
 The three `build-launcher-*` jobs build `clients/launcher/` into
 `build-launcher/`, never `build/`, so a launcher job and a game job
-cannot collide on artifacts. None of them runs an auto-updater e2e —
-the launcher has no self-updater yet
-(`docs/plans/2026-08-04-launcher-self-update.md`).
+cannot collide on artifacts.
 
-- `build-launcher-macos` runs the same sign → notarize → staple →
+- `build-launcher-macos` gates on its own self-update e2e
+  (`infra/scripts/test-launcher-updater.sh`, before signing, on a
+  scratch copy) and then runs the same sign → notarize → staple →
   `create-dmg` → sign/notarize/staple-the-DMG sequence as
-  `build-macos`, on the same Apple secrets. arm64 only, on purpose
-  (`clients/launcher/CLAUDE.md` has the reasoning).
+  `build-macos`, on the same Apple secrets. It also signs the
+  launcher's nested `Contents/Helpers/updater-stage-2`. arm64 only, on
+  purpose (`clients/launcher/CLAUDE.md` has the reasoning).
 - `build-launcher-windows` uses its **own** vcpkg cache path and key —
   `clients/launcher/vcpkg.json` is a different dependency set from the
   game's, so sharing `build-silencer-windows`'s cache would thrash it.

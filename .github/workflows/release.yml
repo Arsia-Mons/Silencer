@@ -257,10 +257,10 @@ jobs:
 
   build-launcher-macos:
     # Same macos-15 pin as build-macos, for the same reason (the newer dyld's
-    # duplicate-LC_RPATH abort). The launcher does not run the auto-updater
-    # e2e — it has no self-updater yet (see docs/plans/2026-08-04-launcher-
-    # self-update.md), so this job is build -> bundle -> sign -> notarize ->
-    # DMG and nothing else.
+    # duplicate-LC_RPATH abort). Like build-macos, the job gates on a headless
+    # self-update e2e before anything is signed: a broken launcher updater is
+    # worse than a broken game updater, because the launcher can repair the
+    # game but nothing in-app repairs the launcher.
     runs-on: macos-15
     timeout-minutes: 45
     needs: version
@@ -282,6 +282,16 @@ jobs:
           launcher-version: ${{ env.SILENCER_VERSION }}
           launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
           build-dir: build-launcher
+
+      - name: Launcher self-update e2e (headless)
+        # OLD = the just-built (still unsigned) release bundle; NEW = a second
+        # build versioned 99999 (sccache-warm off the release objects). Runs on
+        # a scratch copy of the bundle, so the shipped artifact stays pristine.
+        # Unsigned OLD means the Developer ID payload check exercises its skip
+        # path here; the enforce path needs a signed running build.
+        env:
+          OLD_BUILD_DIR: ${{ github.workspace }}/build-launcher
+        run: bash infra/scripts/test-launcher-updater.sh
 
       - name: Import Developer ID cert
         env:
@@ -320,6 +330,8 @@ jobs:
           find "Silencer Launcher.app/Contents/Frameworks" -name "*.dylib" -print0 \
             | xargs -0 -n1 codesign --force --timestamp --options runtime \
               --sign "$IDENTITY"
+          codesign --force --timestamp --options runtime \
+            --sign "$IDENTITY" "Silencer Launcher.app/Contents/Helpers/updater-stage-2"
           codesign --force --timestamp --options runtime \
             --sign "$IDENTITY" "Silencer Launcher.app/Contents/MacOS/Silencer Launcher"
           codesign --force --timestamp --options runtime \

@@ -7,6 +7,7 @@
 
 #include "ui/components/box.h"
 
+#include <cstdio>
 #include <string>
 
 namespace launcher {
@@ -43,6 +44,58 @@ struct LinkProps {
   >
     <Label key="lnk-t" value={props.label} color={kTextFaint} align={TextAlign::Center} />
   </Box>
+}
+
+// The launcher's own update. Absent until the manifest offers a build this
+// binary is not; while the update runs the chip narrates and the click is
+// dead. Success exits the launcher — stage-2 swaps the bundle and relaunches.
+struct SelfUpdateChipProps {
+  const char *key = nullptr;
+};
+
+::ui::UiElement SelfUpdateChip(const SelfUpdateChipProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  const Intents &in = use_intents();
+
+  std::string label;
+  bool busy = false;
+  switch (s.self_update) {
+  case SelfUpdateStatus::Available:
+    label = "UPDATE LAUNCHER";
+    break;
+  case SelfUpdateStatus::Downloading: {
+    char pct[32];
+    snprintf(pct, sizeof(pct), "UPDATING %d%%", (int)(s.self_progress * 100.0f));
+    label = pct;
+    busy = true;
+    break;
+  }
+  case SelfUpdateStatus::Verifying:
+    label = "VERIFYING...";
+    busy = true;
+    break;
+  case SelfUpdateStatus::Ready:
+  case SelfUpdateStatus::Spawned:
+    label = "RESTARTING...";
+    busy = true;
+    break;
+  case SelfUpdateStatus::Failed:
+    label = "RETRY UPDATE";
+    break;
+  default:
+    return ::ui::empty();
+  }
+
+  return <AppButton
+    key={props.key}
+    variant={ButtonVariant::UpdateChip}
+    label={dup(label)}
+    disabled={busy}
+    on_activate={[&in](const ::ui::ActivationEvent &) {
+      if (in.self_update)
+        in.self_update();
+    }}
+  />
 }
 
 // SIGN IN when signed out, the username when signed in. Toggles the popover.
@@ -123,6 +176,7 @@ struct AccountChipProps {
   >
     {title}
     <Spacer key="tb-gap" />
+    <SelfUpdateChip key="self-update" />
     <Link key="lnk-web" label="WEBSITE" url="https://arsiamons.com" />
     <Link key="lnk-discord" label="DISCORD" url="https://discord.gg/YHb5wJUCpp" />
     <AccountChip key="acct-chip" st={props.st} />
