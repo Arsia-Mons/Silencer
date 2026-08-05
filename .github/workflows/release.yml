@@ -303,6 +303,82 @@ jobs:
           path: build-launcher/silencer-launcher-macos-arm64.dmg
           if-no-files-found: error
 
+  build-launcher-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute version from tag
+        shell: bash
+        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build launcher
+        uses: ./.github/actions/build-launcher-windows
+        with:
+          launcher-version: ${{ env.SILENCER_VERSION }}
+          build-dir: build-launcher
+
+      - name: Zip portable bundle
+        shell: pwsh
+        run: Compress-Archive -Path "build-launcher/package/silencer-launcher" -DestinationPath build-launcher/silencer-launcher-windows-x64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-windows-x64
+          path: build-launcher/silencer-launcher-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        # Not signed. Same as the game's installer — SmartScreen will warn on
+        # first run, and the release notes say so.
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=$env:SILENCER_VERSION" `
+            clients/launcher/installer/silencer-launcher.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed" }
+          # ISCC writes to <iss-dir>/Output by default. Hoist it so the
+          # upload-artifact glob picks it up.
+          Move-Item clients/launcher/installer/Output/*.exe build-launcher/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-windows-x64-setup
+          path: build-launcher/silencer-launcher-windows-x64-setup-*.exe
+          if-no-files-found: error
+
+  build-launcher-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute version from tag
+        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build launcher
+        uses: ./.github/actions/build-launcher-linux
+        with:
+          launcher-version: ${{ env.SILENCER_VERSION }}
+          build-dir: build-launcher
+
+      - name: Package
+        run: tar czf build-launcher/silencer-launcher-linux-x64.tar.gz -C build-launcher/package silencer-launcher
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-x64
+          path: build-launcher/silencer-launcher-linux-x64.tar.gz
+          if-no-files-found: error
+
   build-windows:
     runs-on: windows-latest
     timeout-minutes: 60
@@ -392,7 +468,13 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [build-macos, build-launcher-macos, build-windows, build-linux]
+    needs:
+      - build-macos
+      - build-launcher-macos
+      - build-windows
+      - build-launcher-windows
+      - build-linux
+      - build-launcher-linux
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -427,21 +509,35 @@ jobs:
             artifacts/launcher-macos-arm64-dmg/*
             artifacts/windows-x64/*
             artifacts/windows-x64-setup/*
+            artifacts/launcher-windows-x64/*
+            artifacts/launcher-windows-x64-setup/*
             artifacts/linux-x64/*
+            artifacts/launcher-linux-x64/*
           body: |
-            ## Downloads
+            ## Downloads — game
 
             - **macOS (Apple Silicon) — DMG (recommended):** `silencer-macos-arm64.dmg` (drag to Applications)
-            - **macOS (Apple Silicon) — launcher DMG:** `silencer-launcher-macos-arm64.dmg` (drag to Applications; installs the game for you)
             - **macOS (Apple Silicon) — portable zip:** `silencer-macos-arm64.zip`
             - **Windows (x64) — installer (recommended):** `silencer-windows-x64-setup-*.exe`
             - **Windows (x64) — portable zip:** `silencer-windows-x64.zip`
             - **Linux (x64):** `silencer-linux-x64.tar.gz`
 
+            ## Downloads — launcher
+
+            Installs and launches the game for you, and shows news and releases.
+
+            - **macOS (Apple Silicon) — DMG:** `silencer-launcher-macos-arm64.dmg` (drag to Applications)
+            - **Windows (x64) — installer:** `silencer-launcher-windows-x64-setup-*.exe`
+            - **Windows (x64) — portable zip:** `silencer-launcher-windows-x64.zip`
+            - **Linux (x64):** `silencer-launcher-linux-x64.tar.gz`
+
             ## First-run warnings
 
             ### Windows
-            The Windows build isn't code-signed. If SmartScreen shows *"Windows protected your PC"*, click **More info** → **Run anyway**.
+            The Windows builds aren't code-signed. If SmartScreen shows *"Windows protected your PC"*, click **More info** → **Run anyway**.
+
+            ### Linux
+            The Linux builds aren't signed or sandboxed either. Extract the tarball and run the binary from inside the extracted dir — `fonts/` and `assets/` have to stay beside it.
 
   publish-npm:
     # Tag-only — manual workflow_dispatch on a non-tag ref skips this job

@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(SilencerLauncherCppx CXX)
 
+# resources.rc (icon + VERSIONINFO) needs the RC language. project() above names
+# CXX explicitly, so RC is not implied — enable it rather than rely on the
+# platform module, which is what clients/silencer gets away with.
+if(WIN32)
+  enable_language(RC)
+endif()
+
 # The launcher reuses the game client's cppx UI engine + updater primitives by
 # compiling their sources directly (no changes to clients/silencer/). SIL points
 # at the client tree two dirs over.
@@ -173,6 +180,21 @@ endif()
 
 if(WIN32)
   target_link_libraries(silencer-launcher PRIVATE ws2_32)
+
+  # Icon + version resource. VERSIONINFO wants a numeric quad, but our tags are
+  # a zero-padded counter (vNNNNN), so map it to 0.0.N.0 — the same mapping
+  # clients/tui/scripts/stage-npm-packages.ts uses for npm semver. Leading
+  # zeros have to go: "0042" is not a number to the RC compiler.
+  string(REGEX REPLACE "^0+" "" LAUNCHER_VERSION_N "${SILENCER_LAUNCHER_VERSION}")
+  if(NOT LAUNCHER_VERSION_N MATCHES "^[0-9]+$")
+    set(LAUNCHER_VERSION_N 0) # "00000", or a non-numeric override
+  endif()
+  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/launcher_version.h.in"
+                 "${CMAKE_CURRENT_BINARY_DIR}/launcher_version.h" @ONLY)
+  target_sources(silencer-launcher PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/resources.rc")
+  # CMake passes <INCLUDES> to rc.exe, so this is how resources.rc finds the
+  # generated header.
+  target_include_directories(silencer-launcher PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 endif()
 
 target_compile_definitions(silencer-launcher PRIVATE

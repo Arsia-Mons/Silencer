@@ -134,10 +134,31 @@ entry that newer dyld hard-aborts on, re-signs, and **fails the script** if any
 `.github/actions/build-silencer-macos/action.yml`, which does the same for the
 game — keep the two in step.
 
-## Distribution (macOS)
+## Distribution
 
-`release.yml`'s **`build-launcher-macos`** job is the whole pipeline, and it
-runs on a `v*` tag next to the game's `build-macos`:
+Three release jobs in `release.yml`, one per platform, each on a `v*` tag
+alongside its game counterpart. All three build into `build-launcher/`, never
+`build/`, so a launcher job and a game job never collide.
+
+| Job | Composite action | Artifacts |
+|---|---|---|
+| `build-launcher-macos` | `build-launcher-macos` | `silencer-launcher-macos-arm64.dmg` |
+| `build-launcher-windows` | `build-launcher-windows` | `silencer-launcher-windows-x64.zip`, `silencer-launcher-windows-x64-setup-*.exe` |
+| `build-launcher-linux` | `build-launcher-linux` | `silencer-launcher-linux-x64.tar.gz` |
+
+Only macOS is signed. Windows and Linux ship unsigned, same as the game's, and
+the release notes tell users what SmartScreen will say.
+
+**The Windows and Linux staging layout is the runtime contract, not packaging
+taste.** `resolve_resource_dir()` probes `fonts/` and `assets/` *beside the
+binary* for the sentinels `silencer-135.otf` and `PALETTE.BIN`. Flatten those
+dirs and the launcher exits before a window opens (missing fonts are fatal —
+see Gotchas). Both composite actions assert the two sentinels before packaging,
+so this fails in CI rather than in a user's hands.
+
+### macOS
+
+`release.yml`'s **`build-launcher-macos`** job is the whole pipeline:
 
 `.github/actions/build-launcher-macos` (configure + build + `package-macos.sh`)
 → import the Developer ID cert → codesign inside-out with
@@ -152,11 +173,7 @@ cannot drift. It reuses `release.yml`'s existing Apple secrets
 `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`) — no new secret. It builds into
 `build-launcher/`, not `build/`, so it never collides with the game job.
 
-`web/website/index.html` links straight at
-`releases/latest/download/silencer-launcher-macos-arm64.dmg`. **Renaming the
-artifact 404s that link.**
-
-### arm64 only, deliberately
+#### arm64 only, deliberately
 
 The launcher is **not** a universal binary, and making it one would be worse
 than not. `CMAKE_OSX_ARCHITECTURES=arm64;x86_64` is technically reachable in
@@ -171,6 +188,34 @@ produces). Rosetta translates x86_64 → arm64, not the reverse, so an Intel Mac
 cannot run the game at all. A universal launcher would install fine there,
 then fail at PLAY — a worse experience than not offering the download. Ship
 universal only when the game does.
+
+### Windows
+
+`.github/actions/build-launcher-windows` configures against vcpkg (its **own**
+binary cache, keyed on `clients/launcher/vcpkg.json` — the launcher's
+dependency set is not the game's, and sharing a cache thrashes it), builds,
+then stages the exe + the vcpkg DLLs + `fonts/` + `assets/`. The release job
+zips that, then runs ISCC over
+[`installer/silencer-launcher.iss`](installer/CLAUDE.md).
+
+`resources.rc` gives the exe its icon and a **VERSIONINFO** block, so
+`-DSILENCER_LAUNCHER_VERSION` is not a macOS-only no-op. VERSIONINFO needs a
+numeric quad, and our tags are a zero-padded counter, so CMake maps `NNNNN` →
+`0,0,N,0` (the same mapping `clients/tui` uses for npm semver) and writes it
+into a generated `launcher_version.h` that `resources.rc` includes. Leading
+zeros must go — `0042` is not a number to the RC compiler. `project()` names
+CXX explicitly, so `enable_language(RC)` is called for `WIN32` rather than
+relying on the platform module to imply it.
+
+### Linux
+
+`.github/actions/build-launcher-linux` builds, copies `libSDL3.so.0` and
+`libSDL3_ttf.so.0` **dereferenced** (`cp -L` — the binary's NEEDED entry is the
+soname, so the loader wants a regular file at that path), `patchelf --set-rpath
+'$ORIGIN'` so they resolve from the executable's own dir, then copies `fonts/`
+and `assets/`. It fails the build if `ldd` reports anything "not found". The
+release job tars it. There is no `.desktop` file or icon install — the tarball
+is a run-from-anywhere bundle, not a distro package.
 
 ### Self-update
 

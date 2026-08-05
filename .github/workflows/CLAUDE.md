@@ -42,9 +42,11 @@ these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 |---|---|
 | `release.yml` | push of `v*` tag, or manual dispatch |
 
-`release.yml` jobs: `build-macos` + `build-launcher-macos` +
-`build-windows` + `build-linux`
-(parallel) → `release` (creates the GitHub Release) → `publish-npm`
+`release.yml` jobs: six parallel builds — `build-macos`,
+`build-windows`, `build-linux` for the game and
+`build-launcher-macos`, `build-launcher-windows`,
+`build-launcher-linux` for the launcher
+→ `release` (creates the GitHub Release) → `publish-npm`
 (stages and publishes the five npm packages described in
 `clients/tui/CLAUDE.md`).
 
@@ -57,15 +59,25 @@ the new version relaunches — gating the release on a working self-updater
 and needs `oven-sh/setup-bun` (the harness drives the game via `clients/cli`).
 `build-linux` has no such step (Linux isn't a shipped self-update platform).
 
-`build-launcher-macos` builds `clients/launcher/` into `build-launcher/`
-(never `build/` — both macOS jobs run from their own checkout, but the
-separate dir keeps the two artifact trees obviously distinct), then runs
-the same sign → notarize → staple → `create-dmg` → sign/notarize/staple
-the DMG sequence as `build-macos`, on the same Apple secrets. It has no
-auto-updater e2e because the launcher has no self-updater yet
-(`docs/plans/2026-08-04-launcher-self-update.md`). Its DMG name,
-`silencer-launcher-macos-arm64.dmg`, is linked directly from
-`web/website/index.html` — renaming it breaks that link.
+The three `build-launcher-*` jobs build `clients/launcher/` into
+`build-launcher/`, never `build/`, so a launcher job and a game job
+cannot collide on artifacts. None of them runs an auto-updater e2e —
+the launcher has no self-updater yet
+(`docs/plans/2026-08-04-launcher-self-update.md`).
+
+- `build-launcher-macos` runs the same sign → notarize → staple →
+  `create-dmg` → sign/notarize/staple-the-DMG sequence as
+  `build-macos`, on the same Apple secrets. arm64 only, on purpose
+  (`clients/launcher/CLAUDE.md` has the reasoning).
+- `build-launcher-windows` uses its **own** vcpkg cache path and key —
+  `clients/launcher/vcpkg.json` is a different dependency set from the
+  game's, so sharing `build-silencer-windows`'s cache would thrash it.
+  Produces a portable zip and an Inno Setup installer.
+- `build-launcher-linux` bundles SDL3 with `patchelf --set-rpath
+  '$ORIGIN'` and tars it.
+
+None of the launcher jobs has a **PR CI counterpart**, so they first
+run on a real tag. Add one before relying on a release.
 
 `publish-npm` requires the `NPM_TOKEN` secret (granular publish
 token for the `arsia-mons` scope + the unscoped `silencer-tui`

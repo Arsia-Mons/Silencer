@@ -1,14 +1,16 @@
 # web/website — public landing page (arsiamons.com)
 
 Single static page: logo, two-paragraph pitch (preserved Mind Control
-Software, 2000 blurb), four CTAs (Download / Launcher / GitHub /
-Discord). No framework, no build step, no JS shipped to the browser.
+Software, 2000 blurb), three CTAs (Download / GitHub / Discord). No
+framework, no build step, no JS shipped to the browser.
 
-The Launcher link is a **direct** `.dmg` download off the latest
-release, not the releases page — hence the `(mac)` in the label. It is
-the one macOS-only artifact here, and `release.yml`'s
-`build-launcher-macos` job is what publishes the file the URL points
-at. Rename the artifact there and this link 404s.
+**Download** points at the releases page, not at an asset. That page
+lists both products — the game and the launcher — for all three
+platforms, split under two headings by `release.yml`'s release body. A
+direct per-asset link would need OS sniffing, and this page ships no
+JS on purpose. There was briefly a second `launcher (mac)` CTA linking
+straight at the DMG; it went away once the launcher stopped being
+macOS-only.
 
 ## Files
 
