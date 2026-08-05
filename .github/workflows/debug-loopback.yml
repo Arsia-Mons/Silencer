@@ -20,8 +20,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - name: Probe
+        # A diagnostic must run every probe, so a probe that legitimately exits
+        # non-zero (a refused connection IS a result) must not abort the step.
+        shell: bash --noprofile --norc {0}
         run: |
-          set -x
+          set +e
           echo "IMAGE_VERSION=${ImageVersion:-$IMAGE_VERSION}"
           sw_vers
           curl --version
