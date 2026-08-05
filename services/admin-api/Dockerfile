@@ -12,6 +12,7 @@ COPY clients/tui/package.json            ./clients/tui/
 COPY services/admin-api/package.json     ./services/admin-api/
 COPY shared/fonts/package.json           ./shared/fonts/
 COPY shared/gas-validation/package.json  ./shared/gas-validation/
+COPY shared/news/package.json            ./shared/news/
 COPY web/admin/package.json              ./web/admin/
 COPY web/website/package.json            ./web/website/
 RUN bun install --production --frozen-lockfile --filter ./services/admin-api
