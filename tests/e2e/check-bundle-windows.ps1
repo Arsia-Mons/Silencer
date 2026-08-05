@@ -2,11 +2,15 @@
 # imported by Silencer.exe (transitively) must resolve to a file inside the
 # package dir or to a system DLL under C:\Windows\System32 (or SysWOW64).
 #
-# Usage: pwsh tests/e2e/check-bundle-windows.ps1 -PackageDir <dir>
+# Usage: pwsh tests/e2e/check-bundle-windows.ps1 -PackageDir <dir> [-ExeName <name>]
+#
+# ExeName defaults to the game binary, so existing calls are unchanged. The
+# launcher passes -ExeName silencer-launcher.exe.
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)] [string] $PackageDir
+    [Parameter(Mandatory = $true)] [string] $PackageDir,
+    [string] $ExeName = 'Silencer.exe'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,9 +20,9 @@ if (-not (Test-Path $PackageDir)) {
 }
 $PackageDir = (Resolve-Path $PackageDir).Path
 
-$exe = Join-Path $PackageDir 'Silencer.exe'
+$exe = Join-Path $PackageDir $ExeName
 if (-not (Test-Path $exe)) {
-    throw "Silencer.exe not found in $PackageDir"
+    throw "$ExeName not found in $PackageDir"
 }
 
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'

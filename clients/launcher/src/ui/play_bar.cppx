@@ -1,0 +1,195 @@
+#include "ui/play_bar.h"
+
+#include "ui.h"
+#include "ui/app_button.h"
+#include "ui/primitives.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+
+#include <cstdio>
+#include <string>
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+bool installing(const AppSnapshot &s) {
+  return s.update_status == UpdateStatus::Downloading ||
+         s.update_status == UpdateStatus::Verifying ||
+         s.update_status == UpdateStatus::Extracting;
+}
+
+// Lobby reachability, from the TCP-connect probe.
+struct PingChipProps {
+  const char *key = nullptr;
+};
+
+::ui::UiElement PingChip(const PingChipProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  std::string text;
+  Color color = kTextFaint;
+  switch (s.ping) {
+  case PingStatus::Probing:
+  case PingStatus::Unknown:
+    text = "pinging...";
+    break;
+  case PingStatus::Online:
+    text = std::to_string(s.latency_ms) + " ms";
+    color = kOnline;
+    break;
+  case PingStatus::Offline:
+    text = "lobby offline";
+    color = kOffline;
+    break;
+  }
+  const bool settled = s.ping == PingStatus::Online || s.ping == PingStatus::Offline;
+  return <Box key={props.key} layout={row(8)}>
+    <Dot key="ping-dot" color={settled ? color : kTextFaint} hollow={!settled} />
+    <Label key="ping-ms" value={dup(text)} color={color} />
+  </Box>
+}
+
+// Install progress, beside the split button. Empty when nothing is running.
+struct UpdateProgressProps {
+  const char *key = nullptr;
+};
+
+::ui::UiElement UpdateProgress(const UpdateProgressProps &props) {
+  const AppSnapshot &s = use_snapshot();
+
+  ::ui::UiElement bar = ::ui::empty();
+  ::ui::UiElement line = ::ui::empty();
+  if (s.update_status == UpdateStatus::Downloading) {
+    char pct[32];
+    snprintf(pct, sizeof(pct), "Downloading  %d%%", (int)(s.update_progress * 100.0f));
+    line = Label(LabelProps{.key = "pb-pct", .value = dup(pct), .color = kTextDim});
+    bar = Box(BoxProps{
+        .key = "pb-track",
+        .layout = {.width = Length::points(140), .height = Length::points(8)},
+        .style = ::ui::patch().background(kBorderDim).corner_radius(4.0f),
+        .children = ::ui::children({Box(BoxProps{
+            .key = "pb-fill",
+            .layout = {.width = Length::percent(s.update_progress * 100.0f),
+                       .height = Length::percent(100.0f)},
+            .style = ::ui::patch().background(kAccent).corner_radius(4.0f)})})});
+  } else if (s.update_status == UpdateStatus::Verifying) {
+    line = Label(LabelProps{
+        .key = "pb-pct", .value = "Verifying download...", .color = kTextDim});
+  } else if (s.update_status == UpdateStatus::Extracting) {
+    line = Label(LabelProps{.key = "pb-pct", .value = "Installing...", .color = kTextDim});
+  } else if (s.update_status == UpdateStatus::Failed && !s.update_error.empty()) {
+    // Wrapped: an unbounded error line would shove the split button around.
+    line = Label(LabelProps{.key = "pb-pct",
+                            .value = dup(s.update_error),
+                            .color = kOffline,
+                            .wrap = ::ui::TextWrap::Words,
+                            .width = Length::points(320)});
+  }
+
+  return <Box key={props.key} layout={row(10)}>
+    {line}
+    {bar}
+  </Box>
+}
+
+// Left half of the split button: the active channel, and the drop-up toggle.
+struct ChannelSegmentProps {
+  const char *key = nullptr;
+  UiState *st = nullptr;
+};
+
+::ui::UiElement ChannelSegment(const ChannelSegmentProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  UiState *st = props.st;
+  const ChannelState &active = s.active();
+
+  std::string text = s.channel == "nightly" ? "NIGHTLY" : "STABLE";
+  if (!active.installed.empty())
+    text += " - v" + active.installed;
+  const bool outdated =
+      !active.latest_version.empty() && active.latest_version != active.installed;
+
+  return <AppButton
+    key={props.key}
+    variant={ButtonVariant::Segment}
+    selected={st->drop_open}
+    on_activate={[st](const ::ui::ActivationEvent &) {
+      st->drop_open = !st->drop_open;
+      st->auth_open = false;
+      st->editing_loc = false;
+    }}
+  >
+    <Dot
+      key="seg-dot"
+      color={active.installed.empty() ? kTextFaint : outdated ? kAccent : kOnline}
+      hollow={active.installed.empty()}
+    />
+    <Label key="seg-text" value={dup(text)} color={kAccentBright} />
+    <Label key="seg-caret" value={st->drop_open ? "v" : "^"} color={kTextFaint} />
+  </AppButton>
+}
+
+// Right half: PLAY once installed, INSTALL before that.
+struct PrimaryActionProps {
+  const char *key = nullptr;
+};
+
+::ui::UiElement PrimaryAction(const PrimaryActionProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  const Intents &in = use_intents();
+  const ChannelState &active = s.active();
+  const bool is_installed = !active.installed.empty();
+  const std::string channel = s.channel;
+
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      is_installed ? std::function<void(const ::ui::ActivationEvent &)>(
+                         [&in](const ::ui::ActivationEvent &) {
+                           if (in.play)
+                             in.play();
+                         })
+                   : [&in, channel](const ::ui::ActivationEvent &) {
+                       if (in.install)
+                         in.install(channel);
+                     };
+
+  // PLAY needs a binary that passed its checks; INSTALL needs a manifest that
+  // actually offers something to fetch.
+  const bool blocked = installing(s) ||
+                       (is_installed ? !active.binary_valid
+                                     : active.manifest != ManifestStatus::UpdateAvailable);
+
+  return <AppButton
+    key={props.key}
+    variant={ButtonVariant::Primary}
+    label={is_installed ? "PLAY" : "INSTALL"}
+    disabled={blocked}
+    on_activate={on_activate}
+  />
+}
+
+} // namespace
+
+::ui::UiElement PlayBar(const PlayBarProps &props) {
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.direction = FlexDirection::Row,
+                        .align_items = AlignItems::Center,
+                        .width = Length::percent(100.0f),
+                        .height = Length::points(52),
+                        .gap = 12}}
+  >
+    <PingChip key="ping-chip" />
+    <UpdateProgress key="pb-progress" />
+    <Spacer key="pb-gap" />
+    <Box key="split" layout={row(0)}>
+      <ChannelSegment key="chan-seg" st={props.st} />
+      <PrimaryAction key="primary" />
+    </Box>
+  </Box>
+}
+
+} // namespace launcher

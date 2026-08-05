@@ -1,0 +1,107 @@
+name: Build Silencer Launcher (Windows)
+description: Configure + build + stage the Silencer launcher for Windows x64. Caller must have run actions/checkout first; the Inno Setup installer and uploads live in the caller (release-only).
+
+inputs:
+  launcher-version:
+    description: SILENCER_LAUNCHER_VERSION cmake define. release.yml passes the git tag with its leading v stripped; it reaches the exe through resources.rc's VERSIONINFO.
+    default: "00000"
+  launcher-build-id:
+    description: Build identity stamped in as SILENCER_LAUNCHER_BUILD_ID. Distinct from launcher-version, which must stay numeric for the VERSIONINFO quad; this is what self-update compares. Defaults to the version for a stable build.
+    default: "00000"
+  build-dir:
+    description: Where to configure the build. Kept out of the game's build/ so both jobs can run from one checkout.
+    default: build-launcher
+
+runs:
+  using: composite
+  steps:
+    - name: Capture runner ImageVersion
+      shell: bash
+      # Same reasoning as build-silencer-windows: runner image rotation is what
+      # moves vcpkg port versions and therefore package ABIs, so the cache key
+      # has to include it.
+      run: echo "IMAGE_VERSION=$ImageVersion" >> "$GITHUB_ENV"
+
+    - name: Cache vcpkg binaries
+      uses: actions/cache@v4
+      with:
+        # Its own cache path and key — clients/launcher/vcpkg.json is a
+        # different dependency set (sdl3-ttf + minizip, no sdl3-mixer) than the
+        # game's, so sharing a cache with build-silencer-windows would thrash.
+        path: ${{ github.workspace }}/.vcpkg-cache-launcher
+        key: vcpkg-launcher-${{ runner.os }}-${{ env.IMAGE_VERSION }}-${{ hashFiles('clients/launcher/vcpkg.json') }}
+        restore-keys: |
+          vcpkg-launcher-${{ runner.os }}-${{ env.IMAGE_VERSION }}-
+
+    - name: Cache vcpkg tool downloads
+      uses: actions/cache@v4
+      with:
+        path: C:\vcpkg\downloads\tools
+        key: vcpkg-tools-${{ runner.os }}-${{ env.IMAGE_VERSION }}-v1
+        restore-keys: |
+          vcpkg-tools-${{ runner.os }}-${{ env.IMAGE_VERSION }}-
+
+    - name: Setup sccache
+      uses: mozilla-actions/sccache-action@v0.0.10
+
+    - name: Setup MSVC dev environment
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Setup Python
+      # The cppx transpile step is find_package(Python3 ... REQUIRED).
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Configure
+      shell: pwsh
+      env:
+        VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache-launcher,readwrite"
+        LAUNCHER_VERSION_INPUT: ${{ inputs.launcher-version }}
+        LAUNCHER_BUILD_ID_INPUT: ${{ inputs.launcher-build-id }}
+        BUILD_DIR: ${{ inputs.build-dir }}
+      run: |
+        cmake -B "$env:BUILD_DIR" -S clients/launcher `
+          -G Ninja `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          -DVCPKG_TARGET_TRIPLET=x64-windows `
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+          -DSILENCER_LAUNCHER_VERSION="$env:LAUNCHER_VERSION_INPUT" `
+          -DSILENCER_LAUNCHER_BUILD_ID="$env:LAUNCHER_BUILD_ID_INPUT"
+
+    - name: Build
+      shell: pwsh
+      env:
+        BUILD_DIR: ${{ inputs.build-dir }}
+      run: cmake --build "$env:BUILD_DIR"
+
+    - name: sccache stats
+      if: always()
+      shell: pwsh
+      run: sccache --show-stats
+
+    - name: Stage
+      shell: pwsh
+      env:
+        BUILD_DIR: ${{ inputs.build-dir }}
+      # The exe + the vcpkg DLLs it needs (SDL3, SDL3_ttf and their transitive
+      # deps) + the fonts/ and assets/ trees CMake already staged beside the
+      # exe at POST_BUILD. resolve_resource_dir() (src/main.cpp) probes exactly
+      # those two dir names next to the binary, so the layout here IS the
+      # contract — flatten it and the launcher exits before a window opens.
+      run: |
+        $stage = "$env:BUILD_DIR/package/silencer-launcher"
+        New-Item -ItemType Directory -Force -Path $stage | Out-Null
+        Copy-Item "$env:BUILD_DIR/silencer-launcher.exe" $stage/
+        Copy-Item "$env:BUILD_DIR/vcpkg_installed/x64-windows/bin/*.dll" $stage/
+        Copy-Item -Recurse "$env:BUILD_DIR/fonts" "$stage/fonts"
+        Copy-Item -Recurse "$env:BUILD_DIR/assets" "$stage/assets"
+        Write-Host "--- staged files ---"
+        Get-ChildItem -Recurse $stage | Select-Object -First 40 FullName
+        foreach ($p in @("$stage/fonts/silencer-135.otf", "$stage/assets/PALETTE.BIN")) {
+          if (-not (Test-Path $p)) { throw "missing resource sentinel: $p" }
+        }

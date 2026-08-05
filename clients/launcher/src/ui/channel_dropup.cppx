@@ -1,0 +1,237 @@
+#include "ui/channel_dropup.h"
+
+#include "ui.h"
+#include "ui/app_button.h"
+#include "ui/primitives.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+#include "ui/components/input.h"
+
+#include <cstdio>
+#include <string>
+#include <vector>
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+
+// What the channel is doing right now, and in which colour to say it.
+std::string channel_status_text(const AppSnapshot &s, const std::string &ch, Color *color) {
+  const ChannelState &cs = s.chan(ch);
+  *color = kTextDim;
+  if (s.update_status != UpdateStatus::Idle && s.update_status != UpdateStatus::Done &&
+      s.update_status != UpdateStatus::Failed && s.update_channel == ch) {
+    char buf[48];
+    snprintf(buf, sizeof(buf), "installing... %d%%", (int)(s.update_progress * 100.0f));
+    *color = kAccent;
+    return buf;
+  }
+  if (cs.installed.empty()) {
+    if (cs.manifest == ManifestStatus::Unavailable) {
+      *color = kOffline;
+      return cs.message;
+    }
+    *color = kTextFaint;
+    return "not installed";
+  }
+  if (!cs.latest_version.empty() && cs.latest_version != cs.installed) {
+    *color = kAccent;
+    return "v" + cs.installed + " -> v" + cs.latest_version;
+  }
+  return "v" + cs.installed;
+}
+
+struct ChannelRowProps {
+  const char *key = nullptr;
+  const char *channel = "stable";
+  UiState *st = nullptr;
+};
+
+::ui::UiElement ChannelRow(const ChannelRowProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  const Intents &in = use_intents();
+  UiState *st = props.st;
+  const std::string ch = props.channel;
+  const ChannelState &cs = s.chan(ch);
+  const bool selected = s.channel == ch;
+  const bool busy = s.update_status == UpdateStatus::Downloading ||
+                    s.update_status == UpdateStatus::Verifying ||
+                    s.update_status == UpdateStatus::Extracting;
+  const bool outdated = !cs.latest_version.empty() && cs.latest_version != cs.installed;
+
+  Color status_color;
+  const std::string status = channel_status_text(s, ch, &status_color);
+
+  // INSTALL/UPDATE and UNINSTALL get a row of their own when present. They nest
+  // inside the channel-select button — the hit test picks the deepest
+  // interactive node and activation never bubbles, so they win their own clicks.
+  std::vector<::ui::UiElement> actions;
+  if (!busy) {
+    if (cs.manifest == ManifestStatus::UpdateAvailable || cs.installed.empty())
+      actions.push_back(AppButton(AppButtonProps{
+          .key = dup("chinst-" + ch),
+          .label = cs.installed.empty() ? "INSTALL" : "UPDATE",
+          .disabled = cs.manifest != ManifestStatus::UpdateAvailable,
+          .on_activate = [&in, ch](const ::ui::ActivationEvent &) {
+            if (in.install)
+              in.install(ch);
+          }}));
+    if (!cs.installed.empty())
+      actions.push_back(AppButton(AppButtonProps{
+          .key = dup("chdel-" + ch),
+          .tone = ButtonTone::Faint,
+          .label = "UNINSTALL",
+          .on_activate = [st, ch](const ::ui::ActivationEvent &) {
+            st->confirm_uninstall = ch;
+            st->drop_open = false;
+          }}));
+  }
+  ::ui::UiElement action_row =
+      actions.empty()
+          ? ::ui::empty()
+          : Box(BoxProps{.key = dup("chact-" + ch),
+                         .layout = row_full(8),
+                         .children = ::ui::children(actions)});
+
+  return <AppButton
+    key={props.key}
+    variant={ButtonVariant::ChannelRow}
+    selected={selected}
+    on_activate={[&in, ch](const ::ui::ActivationEvent &) {
+      if (in.set_channel)
+        in.set_channel(ch);
+    }}
+  >
+    <Box key={dup("chhead-" + ch)} layout={row_full(8)}>
+      <Dot
+        key={dup("chdot-" + ch)}
+        color={outdated ? kAccent : kOnline}
+        hollow={cs.installed.empty()}
+      />
+      <Label
+        key={dup("chname-" + ch)}
+        value={ch == "nightly" ? "NIGHTLY" : "STABLE"}
+        color={selected ? kAccentBright : kText}
+      />
+      <Spacer key={dup("chgap-" + ch)} />
+      <Label key={dup("chst-" + ch)} value={dup(status)} color={status_color} />
+    </Box>
+    <Label
+      key={dup("chpath-" + ch)}
+      value={dup(s.base_dir + "/" + ch)}
+      color={kTextFaint}
+      wrap={::ui::TextWrap::Words}
+      width={Length::points(kDropRowTextW)}
+    />
+    {action_row}
+  </AppButton>
+}
+
+// The one path the user can change, edited in place.
+struct InstallLocationProps {
+  const char *key = nullptr;
+  UiState *st = nullptr;
+};
+
+::ui::UiElement InstallLocation(const InstallLocationProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  const Intents &in = use_intents();
+  UiState *st = props.st;
+
+  if (st->editing_loc) {
+    return <Box key={props.key} layout={col_full(8)}>
+      <Input
+        key="cd-loc-input"
+        id="cd-loc-input"
+        focusable
+        autofocus
+        value={dup(st->loc_text)}
+        on_change={[st](const std::string &v) { st->loc_text = v; }}
+        layout={LayoutStyle{.justify_content = JustifyContent::Center,
+                            .width = Length::percent(100.0f),
+                            .height = Length::points(26),
+                            .padding = EdgeSizes{8, 8, 0, 0}}}
+        style={input_style()}
+      />
+      <Box key="cd-locedit" layout={row_full(8)}>
+        <AppButton
+          key="cd-loc-save"
+          label="SAVE"
+          on_activate={[&in, st](const ::ui::ActivationEvent &) {
+            if (in.set_base_dir)
+              in.set_base_dir(st->loc_text);
+            st->editing_loc = false;
+          }}
+        />
+        <AppButton
+          key="cd-loc-cancel"
+          tone={ButtonTone::Muted}
+          label="CANCEL"
+          on_activate={[st](const ::ui::ActivationEvent &) { st->editing_loc = false; }}
+        />
+      </Box>
+    </Box>
+  }
+
+  // The full path, wrapped — a truncated path tells the user nothing.
+  return <Box key={props.key} layout={col_full(8)}>
+    <Label
+      key="cd-loc-path"
+      value={dup(s.base_dir)}
+      color={kTextDim}
+      wrap={::ui::TextWrap::Words}
+      width={Length::points(kDropInnerTextW)}
+    />
+    <Box key="cd-locrow" layout={row_full(8)}>
+      <AppButton
+        key="cd-loc-browse"
+        label="BROWSE..."
+        on_activate={[&in](const ::ui::ActivationEvent &) {
+          if (in.browse_base_dir)
+            in.browse_base_dir();
+        }}
+      />
+      <AppButton
+        key="cd-loc-change"
+        tone={ButtonTone::Muted}
+        label="EDIT PATH"
+        on_activate={[st, &s](const ::ui::ActivationEvent &) {
+          st->loc_text = s.base_dir;
+          st->editing_loc = true;
+        }}
+      />
+    </Box>
+  </Box>
+}
+
+} // namespace
+
+::ui::UiElement ChannelDropup(const ChannelDropupProps &props) {
+  UiState *st = props.st;
+  // Root-anchored: above the playbar (18 pad + 52 bar + 8), right-aligned.
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.position = PositionType::Absolute,
+                        .width = Length::points(kDropW),
+                        .padding = EdgeSizes{12, 12, 10, 10},
+                        .position_inset = EdgeSizes{{}, 18.0f, {}, 78.0f},
+                        .gap = 8}}
+    style={panel_style(kPopover, kBorder, 4.0f)}
+  >
+    <Label key="cd-label" value="CHANNEL" color={kTextFaint} />
+    <ChannelRow key="chrow-stable" channel="stable" st={st} />
+    <ChannelRow key="chrow-nightly" channel="nightly" st={st} />
+    <Divider key="cd-div" />
+    <Label key="cd-loc-label" value="INSTALL LOCATION" color={kTextFaint} />
+    <InstallLocation key="cd-loc" st={st} />
+    <Label key="cd-hint" value="Each channel installs into its own subfolder." color={kTextFaint} />
+  </Box>
+}
+
+} // namespace launcher

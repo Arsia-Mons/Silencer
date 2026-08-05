@@ -1,0 +1,160 @@
+#include "ui/app_button.h"
+
+#include "ui/tokens.h"
+
+#include "ui/components/button.h"
+
+namespace launcher {
+
+using ::ui::children;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+
+namespace {
+
+Color tone_color(ButtonTone tone) {
+  switch (tone) {
+  case ButtonTone::Accent:
+    return kAccent;
+  case ButtonTone::Muted:
+    return kTextDim;
+  case ButtonTone::Faint:
+    return kTextFaint;
+  case ButtonTone::Danger:
+    return kOffline;
+  case ButtonTone::Neutral:
+    return kText;
+  }
+  return kAccent;
+}
+
+// Variant -> box. A map, not a switch: variants scale, switches don't. The
+// widths are literal because a JSX `layout` replaces the whole LayoutStyle —
+// nothing inherits ButtonProps' defaults any more.
+LayoutStyle variant_layout(ButtonVariant variant) {
+  switch (variant) {
+  case ButtonVariant::Chrome:
+    return {.align_items = AlignItems::Center,
+            .justify_content = JustifyContent::Center,
+            .width = Length::points(kControlW),
+            .height = Length::points(24),
+            .padding = EdgeSizes{10, 10, 0, 0}};
+  case ButtonVariant::Chip:
+    return {.direction = FlexDirection::Row,
+            .align_items = AlignItems::Center,
+            .justify_content = JustifyContent::Center,
+            .width = Length::points(kControlW),
+            .height = Length::points(26),
+            .padding = EdgeSizes{10, 10, 0, 0},
+            .gap = 8};
+  case ButtonVariant::Primary:
+    return {.align_items = AlignItems::Center,
+            .justify_content = JustifyContent::Center,
+            .width = Length::points(180),
+            .height = Length::points(52),
+            .padding = EdgeSizes{14, 14, 8, 8}};
+  case ButtonVariant::Tab:
+    return {.align_items = AlignItems::Center,
+            .justify_content = JustifyContent::Center,
+            .width = Length::points(kControlW),
+            .height = Length::points(24),
+            .padding = EdgeSizes{12, 12, 0, 0}};
+  case ButtonVariant::Segment:
+    return {.direction = FlexDirection::Row,
+            .align_items = AlignItems::Center,
+            .justify_content = JustifyContent::Center,
+            .width = Length::points(kControlW),
+            .height = Length::points(52),
+            .padding = EdgeSizes{14, 14, 0, 0},
+            .gap = 8};
+  case ButtonVariant::ListRow:
+    return {.align_items = AlignItems::Stretch,
+            .justify_content = JustifyContent::Center,
+            .width = Length::percent(100.0f),
+            .padding = EdgeSizes{10, 10, 8, 6}};
+  case ButtonVariant::ChannelRow:
+    return {.align_items = AlignItems::Stretch,
+            .width = Length::percent(100.0f),
+            .padding = EdgeSizes{12, 12, 8, 8},
+            .gap = 6};
+  case ButtonVariant::Scrim:
+    return {.position = PositionType::Absolute,
+            .align_items = AlignItems::Center,
+            .justify_content = JustifyContent::Center,
+            .width = Length::percent(100.0f),
+            .height = Length::percent(100.0f),
+            .padding = EdgeSizes{14, 14, 8, 8},
+            .position_inset = EdgeSizes::all_edges(::ui::StyleValue::points(0.0f))};
+  }
+  return {};
+}
+
+// Variant -> paint. The presets live in tokens.h; the two row variants and the
+// segment need `selected`, so they are resolved here rather than there.
+StyleStatePatch variant_style(const AppButtonProps &props) {
+  const bool on = props.selected;
+  switch (props.variant) {
+  case ButtonVariant::Chrome:
+  case ButtonVariant::Chip:
+    return ghost_button(tone_color(props.tone));
+  case ButtonVariant::Primary:
+    return accent_button();
+  case ButtonVariant::Tab:
+    return toggle_button(on);
+  case ButtonVariant::Segment: {
+    // `selected` means the drop-up is open. The focus ring is inset: the split
+    // pair sits flush, so an outset ring would run under the PLAY segment
+    // painted after it.
+    StyleStatePatch sp{};
+    sp.base = ::ui::patch().background(on ? kAccentFaint : kPanel)
+                  .border(border1(kAccent))
+                  .corner_radius(3.0f)
+                  .text(tv(kAccentBright, 11, kFaceBody));
+    sp.hover = ::ui::patch().background(kAccentFaint);
+    sp.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccent, -4.0f});
+    return sp;
+  }
+  case ButtonVariant::ListRow:
+    return panel_style(on ? kAccentRow : kPanelSoft, on ? kAccent : kBorderDim, 3.0f);
+  case ButtonVariant::ChannelRow: {
+    StyleStatePatch sp{};
+    sp.base = ::ui::patch().background(on ? kAccentRow : kPanelSoft)
+                  .border(border1(on ? kAccent : kBorderDim))
+                  .corner_radius(3.0f);
+    if (!on)
+      sp.hover = ::ui::patch().border(border1(kBorder));
+    sp.focus_visible = ::ui::patch().outline(::ui::Outline{2.0f, kAccent, 2.0f});
+    return sp;
+  }
+  case ButtonVariant::Scrim: {
+    // A deliberate dim wash: a fully transparent fill trips the solid-fill fast
+    // path and erases the frame beneath.
+    StyleStatePatch sp{};
+    sp.base = ::ui::patch().background(kDismissWash).border(Border{{0, 0, 0, 0}, {}});
+    return sp;
+  }
+  }
+  return {};
+}
+
+} // namespace
+
+::ui::UiElement AppButton(const AppButtonProps &props) {
+  LayoutStyle layout = variant_layout(props.variant);
+  if (props.width.kind != ::ui::LengthKind::Auto)
+    layout.width = props.width;
+  if (props.height.kind != ::ui::LengthKind::Auto)
+    layout.height = props.height;
+
+  return <Button
+    key={props.key}
+    disabled={props.disabled}
+    label={props.label}
+    on_activate={props.on_activate}
+    layout={layout}
+    style={variant_style(props)}
+    children={props.children}
+  />
+}
+
+} // namespace launcher

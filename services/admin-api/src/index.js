@@ -21,6 +21,7 @@ import mapsRoutes from './routes/maps.js';
 import soundsRoutes from './routes/sounds.js';
 import soundCuesRoutes from './routes/soundcues.js';
 import roadmapRoutes from './routes/roadmap.js';
+import launcherRoutes from './routes/launcher.js';
 import { startBackupScheduler } from './backup/scheduler.js';
 import AdminUser from './db/models/AdminUser.js';
 import RoadmapItem from './db/models/RoadmapItem.js';
@@ -52,6 +53,7 @@ api.use('/maps',          mapsRoutes);
 api.use('/sounds',        soundsRoutes);
 api.use('/sound-cues',   soundCuesRoutes);
 api.use('/roadmap',       roadmapRoutes);
+api.use('/launcher',      launcherRoutes);
 api.get('/health',        (_req, res) => res.json({ ok: true }));
 app.use('/api', api);
 

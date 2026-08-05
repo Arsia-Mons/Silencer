@@ -1,0 +1,120 @@
+#include "ui.h"
+
+#include "ui/auth_popover.h"
+#include "ui/channel_dropup.h"
+#include "ui/confirm_overlay.h"
+#include "ui/content_panel.h"
+#include "ui/font_qa.h"
+#include "ui/play_bar.h"
+#include "ui/app_button.h"
+#include "ui/primitives.h"
+#include "ui/state.h"
+#include "ui/tokens.h"
+#include "ui/top_bar.h"
+
+#include "client/ui/app_shell/navigation/ui_screen.h"
+#include "ui/components/box.h"
+
+#include <memory>
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+// Full-window click target that dismisses open popovers: a deliberate dim
+// wash (a fully transparent fill trips the solid-fill fast path and erases the
+// frame beneath). Painted after the main column but before the popovers, so a
+// click anywhere else closes them while the popover stays interactive.
+struct DismissScrimProps {
+  const char *key = nullptr;
+  UiState *st = nullptr;
+};
+
+::ui::UiElement DismissScrim(const DismissScrimProps &props) {
+  UiState *st = props.st;
+  return <AppButton
+    key={props.key}
+    variant={ButtonVariant::Scrim}
+    on_activate={[st](const ::ui::ActivationEvent &) {
+      st->drop_open = false;
+      st->auth_open = false;
+      st->editing_loc = false;
+    }}
+  />
+}
+
+struct RootProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement RootView(const RootProps &) {
+  const ViewModel &vm = use_launcher();
+  UiState *st = use_state<UiState>(initial_ui_state());
+
+  // Cover-fit the backdrop, dimmed so the phosphor text stays readable;
+  // index-0 pixels are transparent and read as the kBg fill beneath.
+  StyleStatePatch background = ::ui::patch().background(kBg);
+  if (vm.bg_texture)
+    background = ::ui::patch().background(kBg).image(::ui::BackgroundImage{
+        .texture_id = vm.bg_texture,
+        .tint = kBackdropTint,
+        .fit = ::ui::ImageFit::Cover});
+
+  ::ui::UiElement content =
+      st->font_qa ? FontQaPanel(FontQaPanelProps{.key = "content"})
+                  : ContentPanel(ContentPanelProps{.key = "content", .st = st});
+  ::ui::UiElement scrim = (st->drop_open || st->auth_open)
+                              ? DismissScrim(DismissScrimProps{.key = "scrim", .st = st})
+                              : ::ui::empty();
+  ::ui::UiElement auth = st->auth_open
+                             ? AuthPopover(AuthPopoverProps{.key = "auth-pop", .st = st})
+                             : ::ui::empty();
+  ::ui::UiElement drop = st->drop_open
+                             ? ChannelDropup(ChannelDropupProps{.key = "chan-pop", .st = st})
+                             : ::ui::empty();
+  ::ui::UiElement confirm =
+      st->confirm_uninstall.empty()
+          ? ::ui::empty()
+          : ConfirmOverlay(ConfirmOverlayProps{.key = "cf-overlay", .st = st});
+
+  return <Box
+    key="root"
+    layout={LayoutStyle{.width = Length::percent(100.0f),
+                        .height = Length::percent(100.0f),
+                        .padding = EdgeSizes{18, 18, 18, 18},
+                        .gap = 14}}
+    style={background}
+  >
+    <TopBar key="topbar" st={st} />
+    {content}
+    <PlayBar key="playbar" st={st} />
+    {scrim}
+    {auth}
+    {drop}
+    {confirm}
+  </Box>
+}
+
+class LauncherScreen final : public client::ui::UiScreen {
+public:
+  const char *debug_name() const override { return "Launcher"; }
+  bool wants_transition_fade() const override { return false; }
+  bool build_element(::ui::UiElementFrame &, ::ui::UiElement *out) override {
+    if (!out)
+      return false;
+    *out = ::ui::component("LauncherRoot", RootProps{}, RootView, "launcher-root");
+    return true;
+  }
+  void build_ui() override {}
+};
+
+} // namespace
+
+std::unique_ptr<client::ui::UiScreen> make_launcher_screen() {
+  return std::make_unique<LauncherScreen>();
+}
+
+} // namespace launcher

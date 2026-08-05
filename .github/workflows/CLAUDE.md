@@ -1,7 +1,8 @@
 # .github/workflows/ — GitHub Actions
 
-Six CI builds (five required by branch protection on `main`,
-`build-linux` optional until added), three deploys, one release.
+Nine CI builds (five required by branch protection on `main`;
+`build-linux` and the three `build-launcher-*` are optional until
+added), three deploys, one release.
 Path filters for the CI builds live **inside the job**, not in
 `on:` — see "Required check trap" below.
 
@@ -21,6 +22,20 @@ protection settings if/when you want to gate merges on it.
 | `ci-build-admin-api.yml` | every PR + push to `main` | `services/admin-api/**`, root `package.json`, `bun.lock`, or this workflow |
 | `ci-build-admin-web.yml` | every PR + push to `main` | `web/admin/**`, `shared/gas-validation/**`, root `package.json`, `bun.lock`, or this workflow |
 | `ci-build-lobby-docker.yml` | every PR + push to `main` | `services/lobby/**`, `clients/silencer/**`, `shared/assets/**`, or this workflow |
+| `ci-build-launcher-{macos,windows,linux}.yml` | every PR + push to `main` | `clients/launcher/**`, `clients/lobby-sdk/cpp/**`, the **reused** `clients/silencer/src/{ui,render/cppx_ui,client/ui,updater}/**` subtrees, `shared/{fonts,assets,icons}/**`, or the matching action/workflow |
+
+The three launcher builds are **not required checks** — add them via
+branch protection if you want merges gated on them. They exist because
+`clients/launcher/CMakeLists.txt` compiles those `clients/silencer/`
+subtrees **by absolute path**, so a change there can break the launcher
+while every game check stays green. Nothing else catches that. They run
+the same composite actions `release.yml` does, so a CI pass means the
+release build works.
+
+`ci-build-launcher-macos.yml` runs on `macos-latest`, not the `macos-15`
+`release.yml` pins. Deliberate: the newer dyld is the one that
+hard-aborts on a duplicate `LC_RPATH`, so CI is where
+`package-macos.sh`'s dedupe gets proven.
 
 macOS / Windows / Linux denylist (skip the build when **only**
 these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
@@ -40,10 +55,56 @@ these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 
 | Workflow | Triggers (`on:`) |
 |---|---|
-| `release.yml` | push of `v*` tag, or manual dispatch |
+| `release.yml` | push of `v*` tag, nightly cron (07:00 UTC), or manual dispatch |
 
-`release.yml` jobs: `build-macos` + `build-windows` + `build-linux`
-(parallel) → `release` (creates the GitHub Release) → `publish-npm`
+### The `version` job — two version strings, not one
+
+Every build job takes its versions from the single `version` job. It
+emits **two** strings, and conflating them is the trap it exists to
+prevent:
+
+- **`protocol`** — the wire protocol number (`00058`). The lobby
+  compares it against every connecting client
+  (`services/lobby/client.go:157`). A nightly **never** invents a new
+  one: the moment the lobby redeployed at it, every stable client would
+  be rejected. On a non-tag ref it is read out of
+  `clients/silencer/CMakeLists.txt`, not the ref.
+- **`build_id`** — the build's own identity
+  (`00058+nightly.20260805.a1b2c3d`), and the only thing self-update
+  compares. On a tag the two are equal.
+
+The number stays out of `build_id` because
+`CFBundleShortVersionString` and the Windows VERSIONINFO quad both have
+to parse as a number — `clients/launcher/CMakeLists.txt` falls back to
+`0.0.0.0` for anything non-numeric. So the launcher takes both:
+`launcher-version` (numeric, stamped into the plist and the resource)
+and `launcher-build-id` (the identity, a compile define).
+
+Before this job existed each build job ran its own
+`SILENCER_VERSION=${GITHUB_REF_NAME#v}`, which on a branch ref yielded
+the literal string `main`. That path had never been exercised.
+
+**Nightlies skip when `main` has not moved** in 24h — a scheduled run
+with nothing to ship costs three platform builds and a notarization
+round-trip. `workflow_dispatch` always builds, so a nightly can be
+forced. Nightlies publish to the `latest` prerelease tag; `publish-npm`
+stays tag-only.
+
+### `update.json`
+
+The `release` job generates the update manifest from the built
+artifacts (per-platform URL + sha256) and uploads it as a release asset.
+Nothing generated it before, which is why the lobby's
+`-update-manifest` path and the launcher's `manifest_url_*` both
+resolved to a 404 in production. Its shape is
+`services/lobby/update.go`'s `manifestFile` plus `build_id` and
+`channel`, which only the launcher reads; Go ignores the extra fields.
+
+`release.yml` jobs: a `version` job, then six parallel builds — `build-macos`,
+`build-windows`, `build-linux` for the game and
+`build-launcher-macos`, `build-launcher-windows`,
+`build-launcher-linux` for the launcher
+→ `release` (creates the GitHub Release) → `publish-npm`
 (stages and publishes the five npm packages described in
 `clients/tui/CLAUDE.md`).
 
@@ -55,6 +116,28 @@ the new version relaunches — gating the release on a working self-updater
 (issue #303). It runs on a scratch copy so the shipped artifact is untouched,
 and needs `oven-sh/setup-bun` (the harness drives the game via `clients/cli`).
 `build-linux` has no such step (Linux isn't a shipped self-update platform).
+
+The three `build-launcher-*` jobs build `clients/launcher/` into
+`build-launcher/`, never `build/`, so a launcher job and a game job
+cannot collide on artifacts. None of them runs an auto-updater e2e —
+the launcher has no self-updater yet
+(`docs/plans/2026-08-04-launcher-self-update.md`).
+
+- `build-launcher-macos` runs the same sign → notarize → staple →
+  `create-dmg` → sign/notarize/staple-the-DMG sequence as
+  `build-macos`, on the same Apple secrets. arm64 only, on purpose
+  (`clients/launcher/CLAUDE.md` has the reasoning).
+- `build-launcher-windows` uses its **own** vcpkg cache path and key —
+  `clients/launcher/vcpkg.json` is a different dependency set from the
+  game's, so sharing `build-silencer-windows`'s cache would thrash it.
+  Produces a portable zip and an Inno Setup installer.
+- `build-launcher-linux` bundles SDL3 with `patchelf --set-rpath
+  '$ORIGIN'` and tars it.
+
+Each launcher release job has a PR CI counterpart
+(`ci-build-launcher-*.yml`) running the same composite action, so the
+build path is exercised on every relevant PR. The signing, notarization
+and DMG steps are still tag-only — CI has no Apple secrets.
 
 `publish-npm` requires the `NPM_TOKEN` secret (granular publish
 token for the `arsia-mons` scope + the unscoped `silencer-tui`

@@ -1,0 +1,11 @@
+{
+	"name": "silencer-launcher",
+	"version-string": "0.0.0",
+	"description": "Silencer cppx launcher build dependencies (Windows/vcpkg path)",
+	"dependencies": [
+		"sdl3",
+		"sdl3-ttf",
+		"curl",
+		"minizip"
+	]
+}

@@ -1,0 +1,132 @@
+#include "ui/top_bar.h"
+
+#include "ui.h"
+#include "ui/app_button.h"
+#include "ui/primitives.h"
+#include "ui/tokens.h"
+
+#include "ui/components/box.h"
+
+#include <string>
+
+namespace launcher {
+namespace {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+// WEBSITE / DISCORD. A Box, not a Button — see link_button() in tokens.h for
+// why, and why the label comes in as an explicitly styled child.
+struct LinkProps {
+  const char *key = nullptr;
+  const char *label = "";
+  const char *url = "";
+};
+
+::ui::UiElement Link(const LinkProps &props) {
+  const Intents &in = use_intents();
+  std::string url = props.url;
+  return <Box
+    key={props.key}
+    focusable
+    accessibility={{.role = ::ui::SemanticRole::Button, .label = props.label}}
+    on_activate={[&in, url](const ::ui::ActivationEvent &) {
+      if (in.open_url)
+        in.open_url(url);
+    }}
+    layout={LayoutStyle{.align_items = AlignItems::Center,
+                        .justify_content = JustifyContent::Center,
+                        .height = Length::points(24),
+                        .padding = EdgeSizes{10, 10, 0, 0}}}
+    style={link_button()}
+  >
+    <Label key="lnk-t" value={props.label} color={kTextFaint} align={TextAlign::Center} />
+  </Box>
+}
+
+// SIGN IN when signed out, the username when signed in. Toggles the popover.
+struct AccountChipProps {
+  const char *key = nullptr;
+  UiState *st = nullptr;
+};
+
+::ui::UiElement AccountChip(const AccountChipProps &props) {
+  const AppSnapshot &s = use_snapshot();
+  UiState *st = props.st;
+  const bool signed_in = s.auth == AuthStatus::SignedIn;
+  const bool connecting = s.auth == AuthStatus::Connecting;
+
+  std::function<void(const ::ui::ActivationEvent &)> toggle =
+      [st](const ::ui::ActivationEvent &) {
+        st->auth_open = !st->auth_open;
+        st->drop_open = false;
+      };
+  // Signed in, the chip is a dot + the name. Signed out it is a plain label —
+  // and it has to carry NO children at all, because Button renders `label`
+  // only when it has none.
+  if (signed_in) {
+    return <AppButton
+      key={props.key}
+      variant={ButtonVariant::Chip}
+      tone={ButtonTone::Neutral}
+      on_activate={toggle}
+    >
+      <Dot key="acct-dot" color={kOnline} />
+      <Label key="acct-name" value={dup(s.auth_username)} />
+    </AppButton>
+  }
+
+  return <AppButton
+    key={props.key}
+    variant={ButtonVariant::Chip}
+    tone={connecting ? ButtonTone::Faint : ButtonTone::Accent}
+    label={connecting ? "SIGNING IN..." : "SIGN IN"}
+    disabled={connecting}
+    on_activate={toggle}
+  />
+}
+
+} // namespace
+
+::ui::UiElement TopBar(const TopBarProps &props) {
+  const ViewModel &vm = use_launcher();
+
+  // The canonical logo sprite, height-fitted into the 48px bar with its native
+  // aspect preserved. Falls back to the text wordmark when the assets are
+  // missing (same condition that leaves the backdrop a plain fill).
+  constexpr float kLogoH = 28.0f;
+  const bool have_logo = vm.logo_texture && vm.logo_w > 0 && vm.logo_h > 0;
+  ::ui::UiElement title =
+      have_logo
+          ? Box(BoxProps{
+                .key = "title-logo",
+                .layout = {.width = Length::points(kLogoH * (float)vm.logo_w /
+                                                   (float)vm.logo_h),
+                           .height = Length::points(kLogoH)},
+                .style = ::ui::patch().image(::ui::BackgroundImage{
+                    .texture_id = vm.logo_texture, .fit = ::ui::ImageFit::Contain})})
+          : Label(LabelProps{
+                .key = "title", .value = "SILENCER", .size = 23, .face = kFaceTitle});
+
+  // The links are secondary: parked on the right next to the account chip
+  // rather than beside the logo, and faint until hovered.
+  return <Box
+    key={props.key}
+    layout={LayoutStyle{.direction = FlexDirection::Row,
+                        .align_items = AlignItems::Center,
+                        .width = Length::percent(100.0f),
+                        .height = Length::points(48),
+                        .padding = EdgeSizes{16, 16, 0, 0},
+                        .gap = 16}}
+    style={panel_style(kPanel, kBorder, 4.0f)}
+  >
+    {title}
+    <Spacer key="tb-gap" />
+    <Link key="lnk-web" label="WEBSITE" url="https://arsiamons.com" />
+    <Link key="lnk-discord" label="DISCORD" url="https://discord.gg/YHb5wJUCpp" />
+    <AccountChip key="acct-chip" st={props.st} />
+  </Box>
+}
+
+} // namespace launcher

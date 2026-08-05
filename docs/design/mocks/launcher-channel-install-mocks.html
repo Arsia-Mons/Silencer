@@ -1,0 +1,789 @@
+<title>Silencer launcher — interactive prototype</title>
+<style>
+  /* Gallery chrome (single dark theme — a mock of a dark launcher) */
+  :root {
+    --page: #0b0f0c;
+    --page-ink: #aebfae;
+    --page-ink-dim: #6d806e;
+    --frame: #1a231b;
+
+    /* Launcher palette — verbatim from clients/launcher/src/ui.cpp */
+    --bg: #030603;
+    --panel: #080f09;
+    --panel-soft: #060c07;
+    --border: #244228;
+    --border-dim: #142818;
+    --text: #c5e1c5;
+    --text-dim: #92b592;
+    --text-faint: #5b8a65;
+    --accent: #60cd78;
+    --accent-bright: #d1fad7;
+    --accent-deep: #186022;
+    --accent-row: #112d18;
+    --offline: #b06060;
+    --online: #78dc82;
+
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+  }
+  html { background: var(--page); }
+  body {
+    font-family: var(--mono);
+    color: var(--page-ink);
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+    line-height: 1.55;
+  }
+  h1 {
+    color: #cfe3cf;
+    font-size: 1.35rem;
+    letter-spacing: 0.04em;
+    margin: 0 0 4px;
+    text-wrap: balance;
+  }
+  .subtitle { color: var(--page-ink-dim); font-size: 0.85rem; margin: 0 0 28px; max-width: 68ch; }
+  .subtitle strong { color: var(--page-ink); font-weight: 600; }
+
+  .shot {
+    background: var(--bg);
+    border: 1px solid var(--frame);
+    border-radius: 6px;
+    padding: 14px;
+    overflow-x: auto;
+  }
+
+  /* ---- Launcher pieces, mirroring ui.cpp styles ---- */
+  .window {
+    position: relative;
+    width: 900px;
+    height: 600px;
+    box-sizing: border-box;
+    background: var(--bg);
+    border-radius: 4px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .topbar {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 48px;
+    padding: 0 16px;
+    background: rgba(8, 15, 9, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .brand { color: var(--text); font-size: 17px; font-weight: 700; letter-spacing: 0.18em; }
+  .grow { flex: 1; }
+  .status-line { color: var(--text-dim); font-size: 11px; }
+
+  .btn {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 30px;
+    padding: 0 14px;
+    border-radius: 3px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+  .btn-ghost { border: 1px solid var(--border); color: var(--text-dim); background: transparent; }
+  .btn-toggle-on { border: 1px solid var(--accent); color: var(--accent-bright); background: var(--accent-deep); }
+  .btn-toggle-off { border: 1px solid var(--border-dim); color: var(--text-dim); background: transparent; }
+  .btn-small { height: 24px; padding: 0 10px; font-size: 10px; }
+  .caret { color: var(--text-faint); font-size: 9px; }
+
+  .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .dot.ok { background: var(--online); }
+  .dot.warn { background: var(--accent); }
+  .dot.none { background: transparent; border: 1px solid var(--text-faint); }
+  .dot.err { background: var(--offline); }
+
+  .pop {
+    position: absolute;
+    right: 0;
+    box-sizing: border-box;
+    background: rgba(8, 15, 9, 0.97);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    z-index: 10;
+  }
+  .pop-label {
+    color: var(--text-faint);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 2px 2px 0;
+  }
+  .divider { height: 1px; background: var(--border-dim); margin: 2px 0; }
+
+  .ch-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 12px 8px;
+    border-radius: 3px;
+    background: var(--panel-soft);
+    border: 1px solid var(--border-dim);
+  }
+  .ch-row.sel { background: var(--accent-row); border-color: var(--accent); }
+  .ch-head { display: flex; align-items: center; gap: 8px; }
+  .ch-name { color: var(--text); font-size: 13px; letter-spacing: 0.08em; }
+  .ch-row.sel .ch-name { color: var(--accent-bright); }
+  .ch-status { font-size: 11px; color: var(--text-dim); }
+  .ch-status.accent { color: var(--accent); }
+  .ch-status.faint { color: var(--text-faint); }
+  .ch-path { font-size: 10px; color: var(--text-faint); }
+
+  .loc-row { display: flex; align-items: center; gap: 10px; padding: 2px 2px 4px; }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(3, 6, 3, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    border-radius: 4px;
+  }
+  .loc-path { flex: 1; color: var(--text-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .panel-col {
+    box-sizing: border-box;
+    background: rgba(8, 15, 9, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel-label { color: var(--text-faint); font-size: 11px; letter-spacing: 0.12em; }
+  .tabs { display: flex; gap: 8px; align-items: center; }
+  .tab { height: 24px; padding: 0 12px; font-size: 10px; letter-spacing: 0.08em; }
+
+  .rel-cols { display: flex; gap: 12px; flex: 1; min-height: 0; }
+  .rel-list { display: flex; flex-direction: column; gap: 6px; }
+  .rel-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px 6px;
+    border-radius: 3px;
+    background: var(--panel-soft);
+    border: 1px solid var(--border-dim);
+  }
+  .rel-row.sel { background: var(--accent-row); border-color: var(--accent); }
+  .rel-ver { color: var(--text); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .rel-row.sel .rel-ver { color: var(--accent-bright); }
+  .rel-date { color: var(--text-faint); font-size: 10px; }
+  .rel-mark { font-size: 9px; letter-spacing: 0.08em; color: var(--accent); }
+  .rel-detail {
+    flex: 1;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 3px;
+    background: var(--panel-soft);
+    border: 1px solid var(--border-dim);
+    min-width: 0;
+  }
+  .rel-head { display: flex; align-items: baseline; gap: 10px; }
+  .rel-title { color: var(--text); font-size: 15px; letter-spacing: 0.06em; }
+  .notes { margin: 0; padding-left: 16px; color: var(--text-dim); font-size: 12px; line-height: 1.6; }
+  .notes li::marker { color: var(--text-faint); }
+  .news-body { color: var(--text-dim); font-size: 12px; line-height: 1.7; }
+  .news-body strong { color: var(--text); font-weight: 600; }
+  .news-body a { color: var(--accent); text-decoration: underline; }
+  .news-body a:hover { color: var(--accent-bright); }
+
+  .bar { width: 110px; height: 8px; border-radius: 4px; background: var(--border-dim); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+
+  /* ---- Prototype interactivity ---- */
+  #proto button { font-family: var(--mono); cursor: pointer; }
+  #proto .btn-ghost:hover { background: rgba(24, 96, 34, 0.27); border-color: var(--accent); color: var(--accent); }
+  #proto .btn-ghost:active { background: rgba(16, 40, 20, 0.78); }
+  #proto .btn-toggle-off:hover { border-color: var(--border); color: var(--text); }
+  #proto .btn-play { border: 1px solid var(--accent); background: var(--accent-deep); color: var(--accent-bright); }
+  #proto .btn-play:hover { background: rgb(34, 128, 46); border-color: var(--accent-bright); }
+  #proto .btn-play:active { background: rgb(20, 72, 28); }
+  #proto .btn-play[disabled] { background: #0e1a10; border-color: var(--border-dim); color: var(--text-faint); cursor: default; }
+  #proto .ch-row, #proto button.rel-row { width: 100%; box-sizing: border-box; text-align: left; font-size: inherit; cursor: pointer; }
+  #proto .ch-row:hover:not(.sel), #proto button.rel-row:hover:not(.sel) { border-color: var(--border); }
+  #proto button:focus-visible, #proto input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #proto .top-link {
+    color: var(--text-faint);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-decoration: none;
+  }
+  #proto .top-link:hover { color: var(--accent); }
+  #proto .del-link { color: var(--text-faint); border-color: var(--border-dim); }
+  #proto .del-link:hover { background: rgba(176, 96, 96, 0.12); border-color: var(--offline); color: var(--offline); }
+  #proto .loc-input {
+    flex: 1;
+    box-sizing: border-box;
+    background: var(--panel-soft);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 6px;
+    min-width: 0;
+  }
+  #proto .rel-scroll { overflow-y: auto; min-height: 0; }
+  #proto .ping-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim); }
+
+  #proto .playbar { display: flex; align-items: center; gap: 12px; position: relative; }
+  #proto .playbar .pop { top: auto; bottom: 62px; }
+  #proto .split { display: flex; }
+  #proto .chan-seg {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 52px;
+    padding: 0 16px;
+    background: rgba(8, 15, 9, 0.92);
+    border: 1px solid var(--accent);
+    border-right: none;
+    border-radius: 3px 0 0 3px;
+    color: var(--accent-bright);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+  }
+  #proto .chan-seg:hover, #proto .chan-seg.hot { background: rgba(24, 96, 34, 0.27); }
+  #proto .btn-play.seg { width: 180px; height: 52px; font-size: 16px; letter-spacing: 0.12em; border-radius: 0 3px 3px 0; }
+</style>
+
+<h1>Silencer launcher — interactive prototype</h1>
+<p class="subtitle">
+  Starts from a <strong>fresh machine</strong> (nothing installed). Header is brand + links +
+  <strong>optional account</strong>: SIGN IN opens a popover (the lobby auto-registers new
+  usernames, so one form covers everyone); signed in, the chip opens account actions and the game
+  launches pre-authenticated. MANAGE ACCOUNT and forgot-password take over the content panel —
+  an email on file (optional) is the only path to password reset. The bottom bar carries
+  everything linked to playing: ping, and a <strong>split button</strong> — channel segment
+  (opens the drop-up: per-channel status, INSTALL/UPDATE actions, install location defaulting to
+  <strong>next to the launcher</strong>, still CHANGE-able; installs land in
+  <strong>{dir}/{channel}</strong>) fused to the primary action, which reads INSTALL until the
+  active channel exists, then PLAY. The content panel has NEWS | RELEASES tabs — the same
+  list/detail layout for both, releases following the active channel.
+</p>
+<div class="shot">
+  <div id="proto"></div>
+</div>
+
+<script>
+// Snapshot of the shared/news feed (`bun run compile` output) — re-paste to refresh.
+window.SILENCER_NEWS = {
+  "version": 2,
+  "items": [
+    {
+      "slug": "2026-08-03-hello-agent",
+      "title": "Hello, Agent",
+      "date": "2026-08-03",
+      "pinned": false,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "spans": [
+            {
+              "text": "This is the first news item, and thank you for reading it."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+</script>
+<script>
+(() => {
+  const RELEASES = {
+    stable: [
+      { v: "00058", date: "2026-07-28", notes: [
+        "Span-filled solid rects in the CPU raster — full-surface repaints 8× faster.",
+        "IR-diff damage tracking: idle frames now dirty-skip entirely.",
+        "UI TTF faces open with FreeType hinting disabled (fixes banding on Windows).",
+        "Lobby: fixed a refresh broadcast overwriting the CreateGame response.",
+      ]},
+      { v: "00055", date: "2026-07-02", notes: [
+        "Server browser rows show TCP-connect latency with offline detection.",
+        "Announcements feed: pinned items sort first.",
+        "Fixed a crash when the manifest URL returned HTML.",
+      ]},
+      { v: "00052", date: "2026-06-11", notes: [
+        "Self-update: SHA-256 verify before extract.",
+        "New phosphor UI theme across the launcher.",
+      ]},
+      { v: "00049", date: "2026-05-19", notes: [
+        "First public launcher build: channel toggle, news feed, Play.",
+      ]},
+    ],
+    nightly: [
+      { v: "00062-n.4", date: "2026-08-02", notes: [
+        "GPU geometry pass for the cppx UI (SIL-240) behind a flag.",
+        "Frame atomicity: last-good fallback when an element overruns budget.",
+        "Random sprite backdrop cycle in the launcher.",
+      ]},
+      { v: "00062-n.3", date: "2026-07-31", notes: [
+        "Windows port of the cppx launcher (vcpkg: sdl3, curl, minizip).",
+        "Fixed a stale-texture upload on damage-tracked frames.",
+      ]},
+      { v: "00062-n.2", date: "2026-07-29", notes: [
+        "Span/ring solid-fill fast paths in the shared bridge.",
+      ]},
+      { v: "00062-n.1", date: "2026-07-27", notes: [
+        "Nightly channel bootstrap: manifest + update.json publishing.",
+      ]},
+    ],
+  };
+  const LATEST = { stable: "00058", nightly: "00062-n.4" };
+
+  // Compiled from shared/news/content/*.mdx — run `bun run compile` there and
+  // re-paste the snapshot above. Items arrive pre-sorted (pinned first, date desc).
+  const NEWS = (window.SILENCER_NEWS && window.SILENCER_NEWS.items) || [];
+
+  const LAUNCHER_DIR = "~/Games/Silencer"; // where the launcher itself lives — fixed
+
+  const state = {
+    channel: "stable",
+    installed: { stable: null, nightly: null },
+    baseDir: LAUNCHER_DIR, // client installs default to living next to the launcher
+    dropdown: false,
+    tab: "news",           // "news" | "releases" | "account"
+    selRelease: 0,
+    selNews: 0,
+    editingLoc: false,
+    dl: null,              // { ch, pct } while a download is simulated
+    confirmDel: null,      // channel awaiting delete confirmation
+    ping: 34,
+    auth: null,            // { user, email } once signed in
+    authPop: false,
+    resetSent: false,
+    flash: { email: "", pass: "", reset: "" },
+  };
+
+  const root = document.getElementById("proto");
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const chanState = (ch) => {
+    const inst = state.installed[ch];
+    if (state.dl && ch === state.dl.ch) return { dot: "warn", text: `installing… ${state.dl.pct}%`, cls: "" };
+    if (!inst) return { dot: "none", text: "not installed", cls: "faint" };
+    if (inst === LATEST[ch]) return { dot: "ok", text: `v${inst}`, cls: "" };
+    return { dot: "warn", text: `v${inst} → v${LATEST[ch]} available`, cls: "accent" };
+  };
+
+  const dlLine = () => `<span class="status-line">Downloading&nbsp;&nbsp;${state.dl.pct}%</span>
+    <span class="bar" style="width: 120px;"><i style="width: ${state.dl.pct}%;"></i></span>`;
+
+  const chanRow = (ch) => {
+    const s = chanState(ch);
+    const inst = state.installed[ch];
+    let action = "";
+    if (!state.dl) {
+      if (!inst)
+        action = `<button class="btn btn-ghost btn-small" data-action="install" data-ch="${ch}" style="color: var(--accent);">INSTALL</button>`;
+      else {
+        if (inst !== LATEST[ch])
+          action = `<button class="btn btn-ghost btn-small" data-action="install" data-ch="${ch}" style="color: var(--accent);">UPDATE</button>`;
+        action += `<button class="btn btn-ghost btn-small del-link" data-action="ask-delete" data-ch="${ch}">UNINSTALL</button>`;
+      }
+    }
+    return `<div class="ch-row ${ch === state.channel ? "sel" : ""}" data-action="pick-channel" data-ch="${ch}" tabindex="0">
+      <span class="ch-head">
+        <span class="dot ${s.dot}"></span>
+        <span class="ch-name">${ch.toUpperCase()}</span>
+        <span class="grow"></span>
+        <span class="ch-status ${s.cls}">${s.text}</span>
+        ${action}
+      </span>
+      <span class="ch-path">${esc(state.baseDir)}/${ch}</span>
+    </div>`;
+  };
+
+  const dropdown = () => {
+    const loc = state.editingLoc
+      ? `<input class="loc-input" id="proto-loc" value="${esc(state.baseDir)}" spellcheck="false">
+         <button class="btn btn-ghost btn-small" data-action="save-loc">SAVE</button>`
+      : `<span class="loc-path" title="${esc(state.baseDir)}">${esc(state.baseDir)}</span>
+         <button class="btn btn-ghost btn-small" data-action="change-loc">CHANGE…</button>`;
+    return `<div class="pop" id="proto-pop" style="width: 330px;">
+      <span class="pop-label">Channel</span>
+      ${chanRow("stable")}
+      ${chanRow("nightly")}
+      <div class="divider"></div>
+      <span class="pop-label">Install location</span>
+      <div class="loc-row">${loc}</div>
+      <span class="ch-path">launcher: ${esc(LAUNCHER_DIR)}</span>
+    </div>`;
+  };
+
+  const authPop = () => {
+    if (!state.auth) return `<div class="pop" id="proto-auth-pop" style="top: 54px; width: 250px;">
+      <span class="pop-label">Account</span>
+      <div class="loc-row"><input class="loc-input" id="auth-user" placeholder="username" spellcheck="false" maxlength="16"></div>
+      <div class="loc-row"><input class="loc-input" id="auth-pass" type="password" placeholder="password" maxlength="28"></div>
+      <button class="btn btn-ghost" data-action="do-sign-in" style="color: var(--accent);">SIGN IN / REGISTER</button>
+      <div class="divider"></div>
+      <button class="btn btn-ghost btn-small" data-action="forgot">FORGOT PASSWORD…</button>
+    </div>`;
+    const a = state.auth;
+    return `<div class="pop" id="proto-auth-pop" style="top: 54px; width: 250px;">
+      <span class="pop-label">Account</span>
+      <div class="loc-row">
+        <span class="dot ok"></span>
+        <span class="ch-name">${esc(a.user.toUpperCase())}</span>
+      </div>
+      <span class="ch-path">the game launches signed in as ${esc(a.user)}</span>
+      <div class="divider"></div>
+      <button class="btn btn-ghost btn-small" data-action="manage">MANAGE ACCOUNT…</button>
+      <button class="btn btn-ghost btn-small" data-action="sign-out">SIGN OUT</button>
+    </div>`;
+  };
+
+  const topbar = () => {
+    const acct = state.auth
+      ? `<button class="btn btn-ghost btn-small ${state.authPop ? "btn-toggle-on" : ""}" data-action="toggle-auth-pop">
+           <span class="dot ok"></span> ${esc(state.auth.user.toUpperCase())} <span class="caret">${state.authPop ? "▴" : "▾"}</span>
+         </button>`
+      : `<button class="btn btn-ghost btn-small" data-action="toggle-auth-pop" style="color: var(--accent);">SIGN IN</button>`;
+    return `
+    <div class="topbar" style="width: 100%;">
+      <span class="brand">SILENCER</span>
+      <a class="top-link" href="https://arsiamons.com" target="_blank" rel="noopener">WEBSITE</a>
+      <a class="top-link" href="https://discord.gg/silencer" target="_blank" rel="noopener">DISCORD</a>
+      <span class="grow"></span>
+      ${acct}
+      ${state.authPop ? authPop() : ""}
+    </div>`;
+  };
+
+  // Feed block-AST -> HTML (see shared/news/CLAUDE.md for the schema).
+  const spanHtml = (sp) => {
+    let h = esc(sp.text);
+    if (sp.bold) h = `<strong>${h}</strong>`;
+    if (sp.italic) h = `<em>${h}</em>`;
+    if (sp.href) h = `<a href="${esc(sp.href)}" target="_blank" rel="noopener">${h}</a>`;
+    return h;
+  };
+  const spansHtml = (spans) => spans.map(spanHtml).join("");
+  const blockHtml = (b) => {
+    if (b.type === "heading") return `<span class="pop-label">${spansHtml(b.spans)}</span>`;
+    if (b.type === "paragraph") return `<div class="news-body">${spansHtml(b.spans)}</div>`;
+    if (b.type === "list")
+      return `<ul class="notes">${b.items.map((it) => `<li>${spansHtml(it)}</li>`).join("")}</ul>`;
+    return ""; // unknown block types are skipped, not fatal
+  };
+
+  const newsContent = () => {
+    if (!NEWS.length) return `<div class="rel-cols"><div class="rel-detail rel-scroll">
+      <span class="ch-status faint">No announcements</span></div></div>`;
+    const sel = NEWS[Math.min(state.selNews, NEWS.length - 1)];
+    const rows = NEWS.map((n, i) => `
+      <button class="rel-row ${i === state.selNews ? "sel" : ""}" data-action="pick-news" data-i="${i}">
+        <span class="rel-ver">${esc(n.title)} ${n.pinned ? `<span class="rel-mark">PINNED</span>` : ""}</span>
+        <span class="rel-date">${n.date}</span>
+      </button>`).join("");
+    return `<div class="rel-cols">
+      <div class="rel-list rel-scroll" style="width: 180px; flex-shrink: 0;">${rows}</div>
+      <div class="rel-detail rel-scroll">
+        <div class="rel-head">
+          <span class="rel-title">${esc(sel.title)}</span>
+          <span class="rel-date">${sel.date}</span>
+          <span class="grow"></span>
+        </div>
+        <div class="divider"></div>
+        ${sel.blocks.map(blockHtml).join("")}
+      </div>
+    </div>`;
+  };
+
+  const releasesContent = () => {
+    const list = RELEASES[state.channel];
+    const sel = list[Math.min(state.selRelease, list.length - 1)];
+    const rows = list.map((r, i) => {
+      const latest = r.v === LATEST[state.channel];
+      const installed = r.v === state.installed[state.channel];
+      return `<button class="rel-row ${i === state.selRelease ? "sel" : ""}" data-action="pick-release" data-i="${i}">
+        <span class="rel-ver">v${r.v} ${latest ? `<span class="rel-mark">LATEST</span>` : ""}</span>
+        <span class="rel-date">${r.date}${installed ? ` · <span class="rel-mark">INSTALLED</span>` : ""}</span>
+      </button>`;
+    }).join("");
+    const inst = state.installed[state.channel];
+    const detStatus = sel.v === inst ? "installed" : "";
+    return `<div class="rel-cols">
+      <div class="rel-list rel-scroll" style="width: 180px; flex-shrink: 0;">${rows}</div>
+      <div class="rel-detail rel-scroll">
+        <div class="rel-head">
+          <span class="rel-title">v${sel.v}</span>
+          <span class="rel-date">${sel.date}</span>
+          <span class="grow"></span>
+          <span class="ch-status">${detStatus}</span>
+        </div>
+        <div class="divider"></div>
+        <ul class="notes">${sel.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
+      </div>
+    </div>`;
+  };
+
+  const field = (id, ph, type = "text") =>
+    `<input class="loc-input" id="${id}" type="${type}" placeholder="${ph}" spellcheck="false" style="flex: none; width: 240px;">`;
+
+  const resetContent = () => {
+    const step2 = !state.resetSent ? "" : `
+      <div class="divider"></div>
+      <span class="ch-status accent">if that account has an email on file, a reset code is on its way</span>
+      <div class="loc-row">${field("reset-code", "reset code")}</div>
+      <div class="loc-row">${field("reset-pass", "new password", "password")}
+        <button class="btn btn-ghost btn-small" data-action="reset-apply">SET PASSWORD</button></div>
+      ${state.flash.reset ? `<span class="ch-status accent">${state.flash.reset}</span>` : ""}`;
+    return `<div class="rel-cols"><div class="rel-detail rel-scroll">
+      <div class="rel-head"><span class="rel-title">PASSWORD RESET</span></div>
+      <div class="divider"></div>
+      <div class="loc-row">${field("reset-user", "username or email")}
+        <button class="btn btn-ghost btn-small" data-action="reset-request">EMAIL ME A RESET CODE</button></div>
+      <span class="ch-path">resets are possible only for accounts with an email on file</span>
+      ${step2}
+    </div></div>`;
+  };
+
+  const accountContent = () => {
+    if (!state.auth) return resetContent();
+    const a = state.auth;
+    const email = a.email
+      ? `<div class="loc-row"><span class="loc-path">${esc(a.email)}</span>
+           <button class="btn btn-ghost btn-small" data-action="edit-email">CHANGE…</button></div>`
+      : `<div class="loc-row">${field("acct-email", "you@example.com")}
+           <button class="btn btn-ghost btn-small" data-action="save-email">SAVE</button></div>
+         <span class="ch-path">add an email so you can reset a lost password</span>`;
+    return `<div class="rel-cols"><div class="rel-detail rel-scroll">
+      <div class="rel-head">
+        <span class="rel-title">${esc(a.user.toUpperCase())}</span>
+        <span class="grow"></span>
+      </div>
+      <div class="divider"></div>
+      <span class="pop-label">Email</span>
+      ${email}
+      ${state.flash.email ? `<span class="ch-status accent">${state.flash.email}</span>` : ""}
+      <div class="divider"></div>
+      <span class="pop-label">Password</span>
+      <div class="loc-row">${field("acct-pass-cur", "current password", "password")}</div>
+      <div class="loc-row">${field("acct-pass-new", "new password", "password")}
+        <button class="btn btn-ghost btn-small" data-action="change-pass">CHANGE PASSWORD</button></div>
+      ${state.flash.pass ? `<span class="ch-status accent">${state.flash.pass}</span>` : ""}
+    </div></div>`;
+  };
+
+  const mainBody = () => {
+    const tab = (id, text) => `<button class="btn tab ${state.tab === id ? "btn-toggle-on" : "btn-toggle-off"}"
+      data-action="tab" data-tab="${id}">${text}</button>`;
+    const rightLabel = state.tab === "releases" ? state.channel.toUpperCase() : "";
+    return `<div class="panel-col" style="flex: 1; min-height: 0;">
+      <div class="tabs">
+        ${tab("news", "NEWS")}
+        ${tab("releases", "RELEASES")}
+        ${state.auth ? tab("account", "ACCOUNT") : ""}
+        <span class="grow"></span>
+        ${rightLabel ? `<span class="panel-label">${rightLabel}</span>` : ""}
+      </div>
+      ${state.tab === "news" ? newsContent() : state.tab === "releases" ? releasesContent() : accountContent()}
+    </div>
+    <div class="playbar">
+      <span class="ping-chip">
+        <span class="dot ok"></span> <span id="proto-ping" style="color: var(--online);">${state.ping} ms</span>
+      </span>
+      ${state.dl ? dlLine() : ""}
+      <span class="grow"></span>
+      <div class="split">
+        <button class="chan-seg ${state.dropdown ? "hot" : ""}" data-action="toggle-drop">
+          <span class="dot ${chanState(state.channel).dot}"></span>
+          ${state.channel.toUpperCase()}${state.installed[state.channel] ? ` · v${state.installed[state.channel]}` : ""}
+          <span class="caret">${state.dropdown ? "▾" : "▴"}</span>
+        </button>
+        <button class="play btn-play seg" data-action="${state.installed[state.channel] ? "play" : "install"}"
+          ${state.dl ? "disabled" : ""}>
+          ${state.installed[state.channel] ? "PLAY" : "INSTALL"}
+        </button>
+      </div>
+      ${state.dropdown ? dropdown() : ""}
+    </div>`;
+  };
+
+  const confirmDialog = () => {
+    const ch = state.confirmDel;
+    return `<div class="overlay" data-action="cancel-delete">
+      <div class="pop" style="position: static;" data-action="noop">
+        <span class="pop-label">Uninstall channel</span>
+        <span class="ch-status">remove ${ch.toUpperCase()} v${state.installed[ch]} from disk?</span>
+        <span class="ch-path">${esc(state.baseDir)}/${ch}</span>
+        <div class="divider"></div>
+        <div class="loc-row">
+          <button class="btn btn-ghost btn-small" data-action="confirm-delete" style="color: var(--offline);">UNINSTALL</button>
+          <button class="btn btn-ghost btn-small" data-action="cancel-delete">CANCEL</button>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  const render = () => {
+    root.innerHTML = `<div class="window">
+      ${topbar()}
+      ${mainBody()}
+      ${state.confirmDel ? confirmDialog() : ""}
+    </div>`;
+    if (state.editingLoc) {
+      const inp = document.getElementById("proto-loc");
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    }
+    if (state.authPop && !state.auth) {
+      const inp = document.getElementById("auth-user");
+      if (inp) inp.focus();
+    }
+  };
+
+  const doSignIn = () => {
+    const u = document.getElementById("auth-user");
+    const p = document.getElementById("auth-pass");
+    if (!u || !u.value.trim() || !p || !p.value) return;
+    state.auth = { user: u.value.trim(), email: null };
+    state.authPop = false;
+    state.flash = { email: "", pass: "", reset: "" };
+    render();
+  };
+
+  const startInstall = (ch) => {
+    if (state.dl) return;
+    state.dl = { ch, pct: 0 };
+    const tick = setInterval(() => {
+      state.dl.pct = Math.min(100, state.dl.pct + 4);
+      if (state.dl.pct >= 100) {
+        clearInterval(tick);
+        state.installed[ch] = LATEST[ch];
+        state.dl = null;
+      }
+      render();
+    }, 60);
+  };
+
+  const saveLoc = () => {
+    const inp = document.getElementById("proto-loc");
+    if (inp && inp.value.trim()) state.baseDir = inp.value.trim().replace(/[\\/]+$/, "");
+    state.editingLoc = false;
+    render();
+  };
+
+  root.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const act = btn.dataset.action;
+    if (act === "toggle-drop") { state.dropdown = !state.dropdown; state.editingLoc = false; state.authPop = false; }
+    else if (act === "pick-channel") { state.channel = btn.dataset.ch; state.selRelease = 0; }
+    else if (act === "change-loc") state.editingLoc = true;
+    else if (act === "save-loc") return saveLoc();
+    else if (act === "tab") { state.tab = btn.dataset.tab; state.selRelease = 0; }
+    else if (act === "pick-release") state.selRelease = +btn.dataset.i;
+    else if (act === "pick-news") state.selNews = +btn.dataset.i;
+    else if (act === "install") return startInstall(btn.dataset.ch || state.channel);
+    else if (act === "play") return;
+    else if (act === "ask-delete") state.confirmDel = btn.dataset.ch;
+    else if (act === "confirm-delete") { state.installed[state.confirmDel] = null; state.confirmDel = null; }
+    else if (act === "cancel-delete") state.confirmDel = null;
+    else if (act === "toggle-auth-pop") { state.authPop = !state.authPop; state.dropdown = false; }
+    else if (act === "do-sign-in") return doSignIn();
+    else if (act === "sign-out") {
+      state.auth = null;
+      state.authPop = false;
+      state.flash = { email: "", pass: "", reset: "" };
+      if (state.tab === "account") state.tab = "news";
+    }
+    else if (act === "manage") { state.tab = "account"; state.authPop = false; }
+    else if (act === "forgot") { state.tab = "account"; state.authPop = false; state.resetSent = false; state.flash.reset = ""; }
+    else if (act === "save-email") {
+      const inp = document.getElementById("acct-email");
+      if (!inp || !inp.value.trim()) return;
+      state.auth.email = inp.value.trim();
+      state.flash.email = "saved — a verification mail is on its way";
+    }
+    else if (act === "edit-email") { state.auth.email = null; state.flash.email = ""; }
+    else if (act === "change-pass") {
+      const cur = document.getElementById("acct-pass-cur");
+      const nxt = document.getElementById("acct-pass-new");
+      if (!cur || !cur.value || !nxt || !nxt.value) return;
+      state.flash.pass = "password changed";
+    }
+    else if (act === "reset-request") {
+      const inp = document.getElementById("reset-user");
+      if (!inp || !inp.value.trim()) return;
+      state.resetSent = true;
+    }
+    else if (act === "reset-apply") {
+      const code = document.getElementById("reset-code");
+      const pass = document.getElementById("reset-pass");
+      if (!code || !code.value.trim() || !pass || !pass.value) return;
+      state.flash.reset = "password updated — you can sign in now";
+    }
+    render();
+  });
+
+  root.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    if (e.target.id === "proto-loc") { e.preventDefault(); saveLoc(); }
+    else if (e.target.id === "auth-user" || e.target.id === "auth-pass") { e.preventDefault(); doSignIn(); }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (state.confirmDel) { state.confirmDel = null; render(); return; }
+    if (state.dropdown || state.authPop) {
+      state.dropdown = false;
+      state.editingLoc = false;
+      state.authPop = false;
+      render();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (state.confirmDel) return;
+    if (!state.dropdown && !state.authPop) return;
+    const path = e.composedPath().filter((n) => n.nodeType === 1);
+    const inDrop = path.some((n) => n.id === "proto-pop" ||
+      (n.getAttribute && n.getAttribute("data-action") === "toggle-drop"));
+    const inAuth = path.some((n) => n.id === "proto-auth-pop" ||
+      (n.getAttribute && n.getAttribute("data-action") === "toggle-auth-pop"));
+    if (state.dropdown && !inDrop) { state.dropdown = false; state.editingLoc = false; render(); }
+    if (state.authPop && !inAuth) { state.authPop = false; render(); }
+  });
+
+  // Re-ping every 5s: update the chip in place so an open dropdown or the
+  // location editor is never disturbed by a re-render.
+  setInterval(() => {
+    state.ping = 29 + Math.floor(Math.random() * 12);
+    const el = document.getElementById("proto-ping");
+    if (el) el.textContent = `${state.ping} ms`;
+  }, 5000);
+
+  render();
+})();
+</script>

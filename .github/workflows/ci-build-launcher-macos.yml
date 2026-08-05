@@ -1,0 +1,66 @@
+name: CI Build (launcher, macOS)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-build-launcher-macos-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-launcher-macos:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    # macos-latest, not the macos-15 that release.yml pins. Deliberate: the
+    # newer dyld is the one that hard-aborts on a duplicate LC_RPATH, so
+    # running CI there is what proves package-macos.sh's dedupe still works
+    # before a release depends on it.
+    runs-on: macos-latest
+    timeout-minutes: 25
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      # Allowlist, gated inside the job rather than at on:, matching every
+      # other CI build here — a workflow filtered out at on: reports as
+      # "Expected" forever if it is ever made a required check, and blocks
+      # merge. A job whose steps skip via if: still reports success.
+      #
+      # The clients/silencer/ entries are not incidental: CMakeLists.txt
+      # compiles those exact subtrees by absolute path, so a change there can
+      # break the launcher build while every game check stays green. That is
+      # the gap this workflow closes.
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            relevant:
+              - 'clients/launcher/**'
+              - 'clients/lobby-sdk/cpp/**'
+              - 'clients/silencer/src/ui/**'
+              - 'clients/silencer/src/render/cppx_ui/**'
+              - 'clients/silencer/src/client/ui/**'
+              - 'clients/silencer/src/updater/**'
+              - 'clients/silencer/src/platform/perf_trace.*'
+              - 'clients/silencer/third_party/**'
+              - 'clients/silencer/tools/cppx_transpile.py'
+              - 'shared/fonts/**'
+              - 'shared/assets/**'
+              - 'shared/icons/**'
+              - 'tests/e2e/check-bundle-macos.sh'
+              - '.github/actions/build-launcher-macos/**'
+              - '.github/workflows/ci-build-launcher-macos.yml'
+
+      - name: Build launcher
+        if: steps.changes.outputs.relevant == 'true'
+        uses: ./.github/actions/build-launcher-macos
+
+      - name: Verify bundled dependencies
+        if: steps.changes.outputs.relevant == 'true'
+        run: tests/e2e/check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher" ""
+
+      - if: steps.changes.outputs.relevant != 'true'
+        run: echo "No launcher/reused-source/asset changes; skipping launcher macOS build."

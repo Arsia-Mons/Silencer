@@ -1,40 +1,24 @@
 #include "font_registry.h"
 
-#include <string.h>
-
 #ifndef SILENCER_HEADLESS
+#include <SDL3_ttf/SDL_textengine.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #endif
 
 namespace silencer::cppx_ui {
 
-// Safe in headless mode (uses only SDL3, not SDL3_ttf).
-void FontRegistry::clear_text_cache() {
-  for (TextEntry &e : text_cache_) {
-    if (e.tex) {
-      SDL_DestroyTexture(e.tex);
-      e.tex = nullptr;
-    }
-    e.used = false;
-  }
-}
-
 #ifdef SILENCER_HEADLESS
 
-FontRegistry::~FontRegistry() { clear_text_cache(); }
+FontRegistry::~FontRegistry() = default;
 bool FontRegistry::load_faces(const char *) { return false; }
-void FontRegistry::shutdown() { clear_text_cache(); }
-TTF_Font *FontRegistry::face(uint16_t) const { return nullptr; }
-SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *, uint16_t,
-                                               const char *, size_t, int,
-                                               SDL_Color color,
-                                               int *out_w, int *out_h) {
-  if (out_w) *out_w = 0;
-  if (out_h) *out_h = 0;
-  return nullptr;
+void FontRegistry::shutdown() {}
+TTF_Font *FontRegistry::sized_face(uint16_t, int) { return nullptr; }
+bool FontRegistry::draw_text(SDL_Renderer *, uint16_t, int, const char *,
+                             size_t, SDL_Color, float, float) {
+  return false;
 }
-
-} // namespace silencer::cppx_ui
+void FontRegistry::drop_textures() {}
+// sized()/glyph() are unreferenced in headless builds; no definitions needed.
 
 #else // !SILENCER_HEADLESS
 
@@ -47,24 +31,6 @@ const char *kFaceFile[FontRegistry::FaceCount] = {
     "silencer-tiny.otf",     // Tiny
     "silencer-135.otf",      // Heading (bank 135)
 };
-
-// FNV-1a fast-reject hash; lookup still confirms with a full field compare.
-uint64_t key_hash(uint16_t font_id, const char *text, size_t len,
-                  int pixel_size, SDL_Color c) {
-  uint64_t h = 1469598103934665603ull;
-  auto mix = [&](uint8_t b) { h ^= b; h *= 1099511628211ull; };
-  mix(static_cast<uint8_t>(font_id));
-  mix(static_cast<uint8_t>(font_id >> 8));
-  for (size_t i = 0; i < len; ++i)
-    mix(static_cast<uint8_t>(text[i]));
-  mix(static_cast<uint8_t>(pixel_size));
-  mix(static_cast<uint8_t>(pixel_size >> 8));
-  mix(c.r);
-  mix(c.g);
-  mix(c.b);
-  mix(c.a);
-  return h;
-}
 } // namespace
 
 FontRegistry::~FontRegistry() { shutdown(); }
@@ -74,18 +40,29 @@ bool FontRegistry::load_faces(const char *font_dir) {
   for (int i = 0; i < FaceCount; ++i) {
     char path[1024];
     SDL_snprintf(path, sizeof(path), "%s/%s", font_dir, kFaceFile[i]);
-    // Nominal base; real size set per-query via TTF_SetFontSize.
+    // Nominal base; real sizes are per-(face,size) copies via sized_face.
     faces_[i] = TTF_OpenFont(path, 16.0f);
     if (!faces_[i]) {
       SDL_Log("FontRegistry: TTF_OpenFont(%s) failed: %s", path, SDL_GetError());
       ok = false;
+      continue;
     }
+    // These faces are generated pixel fonts (each pixel a 1x1-em square
+    // outline). FreeType's hinter grid-fits those squares and collapses or
+    // doubles rows at any size that isn't the native em, which reads as
+    // horizontal banding. Pure geometric scaling is always right for them.
+    TTF_SetFontHinting(faces_[i], TTF_HINTING_NONE);
   }
   return ok;
 }
 
 void FontRegistry::shutdown() {
-  clear_text_cache(); // free textures before the renderer is destroyed
+  drop_textures(); // free textures before the renderer is destroyed
+  for (auto &sf : sized_) {
+    if (sf->font)
+      TTF_CloseFont(sf->font);
+  }
+  sized_.clear();
   for (int i = 0; i < FaceCount; ++i) {
     if (faces_[i]) {
       TTF_CloseFont(faces_[i]);
@@ -94,84 +71,97 @@ void FontRegistry::shutdown() {
   }
 }
 
-TTF_Font *FontRegistry::face(uint16_t font_id) const {
-  uint16_t idx = font_id < FaceCount ? font_id : Body;
-  return faces_[idx] ? faces_[idx] : faces_[Body];
-}
-
-SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *renderer,
-                                               uint16_t font_id,
-                                               const char *text, size_t len,
-                                               int pixel_size, SDL_Color color,
-                                               int *out_w, int *out_h) {
-  TTF_Font *font = face(font_id);
-  if (!renderer || !font || !text || len == 0 ||
-      len >= static_cast<size_t>(kTextKeyBytes) || pixel_size <= 0)
-    return nullptr;
-
-  ++text_clock_;
-  const uint64_t h = key_hash(font_id, text, len, pixel_size, color);
-
-  int lru = 0;
-  uint64_t lru_tick = UINT64_MAX;
-  for (int i = 0; i < kTextCacheCap; ++i) {
-    TextEntry &e = text_cache_[i];
-    if (!e.used) {
-      if (lru_tick != 0) {
-        lru = i;
-        lru_tick = 0;
-      }
-      continue;
+void FontRegistry::drop_textures() {
+  for (auto &sf : sized_) {
+    for (auto &kv : sf->glyphs) {
+      if (kv.second.tex)
+        SDL_DestroyTexture(kv.second.tex);
     }
-    if (e.hash == h && e.len == static_cast<int>(len) &&
-        e.font_id == font_id && e.pixel_size == pixel_size &&
-        e.color.r == color.r && e.color.g == color.g &&
-        e.color.b == color.b && e.color.a == color.a &&
-        memcmp(e.bytes, text, len) == 0) {
-      e.last_used = text_clock_;
-      if (out_w)
-        *out_w = e.w;
-      if (out_h)
-        *out_h = e.h;
-      return e.tex;
-    }
-    if (e.last_used < lru_tick) {
-      lru_tick = e.last_used;
-      lru = i;
-    }
+    sf->glyphs.clear();
   }
-
-  TTF_SetFontSize(font, static_cast<float>(pixel_size));
-  SDL_Surface *surface = TTF_RenderText_Blended(font, text, len, color);
-  if (!surface)
-    return nullptr;
-  SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surface);
-  const int tw = surface->w, th = surface->h;
-  SDL_DestroySurface(surface);
-  if (!tex)
-    return nullptr;
-
-  TextEntry &e = text_cache_[lru];
-  if (e.tex)
-    SDL_DestroyTexture(e.tex);
-  e.used = true;
-  e.hash = h;
-  e.len = static_cast<int>(len);
-  e.font_id = font_id;
-  e.pixel_size = pixel_size;
-  e.color = color;
-  memcpy(e.bytes, text, len);
-  e.tex = tex;
-  e.w = tw;
-  e.h = th;
-  e.last_used = text_clock_;
-  if (out_w)
-    *out_w = tw;
-  if (out_h)
-    *out_h = th;
-  return tex;
 }
 
-} // namespace silencer::cppx_ui
+FontRegistry::SizedFont *FontRegistry::sized(uint16_t font_id, int pixel_size) {
+  if (pixel_size <= 0)
+    return nullptr;
+  const uint16_t idx = font_id < FaceCount ? font_id : Body;
+  const uint16_t face_id = faces_[idx] ? idx : (uint16_t)Body;
+  if (!faces_[face_id])
+    return nullptr;
+  for (auto &sf : sized_) {
+    if (sf->face_id == face_id && sf->pixel_size == pixel_size)
+      return sf.get();
+  }
+  TTF_Font *font = TTF_CopyFont(faces_[face_id]);
+  if (!font)
+    return nullptr;
+  TTF_SetFontSize(font, static_cast<float>(pixel_size));
+  TTF_SetFontHinting(font, TTF_HINTING_NONE);
+  sized_.push_back(std::unique_ptr<SizedFont>(new SizedFont{}));
+  SizedFont *sf = sized_.back().get();
+  sf->font = font;
+  sf->face_id = face_id;
+  sf->pixel_size = pixel_size;
+  return sf;
+}
+
+TTF_Font *FontRegistry::sized_face(uint16_t font_id, int pixel_size) {
+  SizedFont *sf = sized(font_id, pixel_size);
+  return sf ? sf->font : nullptr;
+}
+
+FontRegistry::Glyph &FontRegistry::glyph(SDL_Renderer *renderer, SizedFont &sf,
+                                         uint32_t glyph_index) {
+  Glyph &g = sf.glyphs[glyph_index];
+  if (!g.loaded) {
+    ++rasterizations_;
+    // White coverage; draw sites tint via color/alpha mod. A null image
+    // (blank cell) stays a no-op glyph.
+    SDL_Surface *surface =
+        TTF_GetGlyphImageForIndex(sf.font, glyph_index, nullptr);
+    if (surface) {
+      g.tex = SDL_CreateTextureFromSurface(renderer, surface);
+      SDL_DestroySurface(surface);
+    }
+    g.loaded = true;
+  }
+  return g;
+}
+
+bool FontRegistry::draw_text(SDL_Renderer *renderer, uint16_t font_id,
+                             int pixel_size, const char *text, size_t len,
+                             SDL_Color color, float x, float y) {
+  SizedFont *sf = sized(font_id, pixel_size);
+  if (!sf || !renderer || !text || len == 0)
+    return false;
+  // SDL_ttf's own layout engine positions the run (fractional 26.6 pen,
+  // kerning — the same layout TTF_GetStringSize measures, so measure ==
+  // paint); a transient TTF_Text exposes the positioned glyph ops and the
+  // pixels come from our rasterize-once glyph cache.
+  TTF_Text *tt = TTF_CreateText(nullptr, sf->font, text, len);
+  if (!tt)
+    return false;
+  TTF_UpdateText(tt);
+  const TTF_TextData *td = tt->internal;
+  for (int i = 0; td && i < td->num_ops; ++i) {
+    const TTF_DrawOperation &op = td->ops[i];
+    if (op.cmd != TTF_DRAW_COMMAND_COPY)
+      continue;
+    Glyph &g = glyph(renderer, *sf, op.copy.glyph_index);
+    if (!g.tex)
+      continue;
+    SDL_SetTextureColorMod(g.tex, color.r, color.g, color.b);
+    SDL_SetTextureAlphaMod(g.tex, color.a);
+    const SDL_FRect src = {(float)op.copy.src.x, (float)op.copy.src.y,
+                           (float)op.copy.src.w, (float)op.copy.src.h};
+    const SDL_FRect dst = {x + (float)op.copy.dst.x, y + (float)op.copy.dst.y,
+                           (float)op.copy.dst.w, (float)op.copy.dst.h};
+    SDL_RenderTexture(renderer, g.tex, &src, &dst);
+  }
+  TTF_DestroyText(tt);
+  return true;
+}
 
 #endif // !SILENCER_HEADLESS
+
+} // namespace silencer::cppx_ui

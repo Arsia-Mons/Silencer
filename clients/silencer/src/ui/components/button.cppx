@@ -1,5 +1,7 @@
 #include "button.h"
 
+#include "ui/components/text.h"
+
 namespace ui::components {
 namespace {
 
@@ -22,6 +24,20 @@ namespace {
   const ::ui::VisualStyle visual =
       ::ui::resolve(::ui::use_theme().button, props.style,
                     detail::interaction_state(props.disabled));
+
+  // The label MUST be a styled Text CHILD: the runtime only paints text on
+  // Text-role nodes, so this Host's own text value never renders, and a bare
+  // string child would paint the engine's neutral default — silently dropping
+  // the text visual the caller resolved above. Feed `visual.text` back in as
+  // an explicit Text child so a `.text()` style patch actually lands.
+  // (`silencer::AppButton` has always hand-rolled this same workaround.)
+  ::ui::StyleStatePatch label_style{};
+  label_style.base = ::ui::patch().text(visual.text);
+  const ::ui::UiElement label_el =
+      (props.label && props.children.count == 0)
+          ? Text(TextProps{.value = props.label, .style = label_style})
+          : ::ui::empty();
+
   return <detail.Host
     kind={::ui::HostKind::Button}
     key={props.key}
@@ -35,7 +51,7 @@ namespace {
     callbacks={button_callbacks(props)}
   >
     {props.children}
-    {props.children.count > 0 ? nullptr : props.label}
+    {label_el}
   </detail.Host>
 }
 

@@ -53,6 +53,19 @@ unit + env file + Mongo/LavinMQ co-location are described in
   actors. Reads/writes `shared/assets/behaviortrees/<id>.json`. Node type
   whitelist enforced server-side (`Selector`, `Sequence`, `Leaf`, etc.).
   The game client fetches these at startup for the BT interpreter.
+- `src/routes/launcher.js` — everything `clients/launcher` fetches over HTTP:
+  `GET /launcher/manifest/:channel`, `/launcher/news`, `/launcher/releases`.
+  Public (the launcher has no session yet) and GET-only. Two rules for all
+  three — a file in `LAUNCHER_DIR` wins, else a 5-min-cached upstream proxy.
+  Deliberately no third tier reading `web/website/announcements.json`: that
+  path only exists outside the container, so it made local and prod take
+  different branches. Keep the resolution identical in both. A
+  manifest has no upstream, so an unpublished channel is a 404.
+  `:channel` accepts `stable`, `nightly`, and `self` — the last is the
+  launcher's own build, which it polls to update itself. It is not a game
+  channel (the launcher ships on one track) but resolves by the same rule, so
+  it shares the handler. Manifests are produced by `release.yml`'s `release`
+  job; `nightly` is republished by its 07:00 UTC cron.
 - `src/routes/players.js` — `PATCH /:id/ban` and `DELETE /:id`
   proxy to the lobby's internal HTTP (`LOBBY_PLAYER_AUTH_URL`)
   so live clients are kicked. Lobby unreachable is logged but
@@ -117,6 +130,11 @@ unit + env file + Mongo/LavinMQ co-location are described in
   box).
 - **Default seed `admin/admin`** runs only if the `AdminUser`
   collection is empty. Don't ship to prod without changing it.
+- **`bun src/index.js` may not boot locally.** On Bun 1.3.1 the
+  `mongoose` → `bson` import dies with `NotImplementedError: node:v8
+  isBuildingSnapshot`. It fails at import, before any route code runs, so
+  route-level work can be exercised by mounting the router under a bare
+  Express app without the Mongo/AMQP bootstrap.
 - **`fetch` is global** in Bun (and was in Node 22) — no `node-fetch`
   import needed.
 - **`bun install --frozen-lockfile`** is what the Dockerfile uses,

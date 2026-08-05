@@ -4,6 +4,14 @@ Single static page: logo, two-paragraph pitch (preserved Mind Control
 Software, 2000 blurb), three CTAs (Download / GitHub / Discord). No
 framework, no build step, no JS shipped to the browser.
 
+**Download** points at the releases page, not at an asset. That page
+lists both products — the game and the launcher — for all three
+platforms, split under two headings by `release.yml`'s release body. A
+direct per-asset link would need OS sniffing, and this page ships no
+JS on purpose. There was briefly a second `launcher (mac)` CTA linking
+straight at the DMG; it went away once the launcher stopped being
+macOS-only.
+
 ## Files
 
 - `index.html` — the page.

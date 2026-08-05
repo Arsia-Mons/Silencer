@@ -1,8 +1,13 @@
 #include "silencer/lobby/client.h"
 
-#include <arpa/inet.h>
 #include <cerrno>
 #include <cstring>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -10,11 +15,49 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif
 
 namespace silencer {
 namespace lobby {
 
 namespace {
+
+// Winsock vs POSIX seam: last error code, its message, and the two
+// non-fatal cases the poll/send loops care about.
+#ifdef _WIN32
+int net_errno() { return ::WSAGetLastError(); }
+std::string net_strerror(int err) { return "winsock error " + std::to_string(err); }
+bool err_would_block(int err) { return err == WSAEWOULDBLOCK; }
+bool err_in_progress(int err) { return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS; }
+bool err_interrupted(int err) { return err == WSAEINTR; }
+
+void ensure_winsock() {
+    static bool done = [] {
+        WSADATA wsa;
+        return ::WSAStartup(MAKEWORD(2, 2), &wsa) == 0;
+    }();
+    (void)done;
+}
+
+void close_sock(int& s) {
+    if (s != -1) {
+        ::closesocket((SOCKET)s);
+        s = -1;
+    }
+}
+
+void set_nonblocking(int s) {
+    u_long one = 1;
+    ::ioctlsocket((SOCKET)s, FIONBIO, &one);
+}
+#else
+int net_errno() { return errno; }
+std::string net_strerror(int err) { return std::strerror(err); }
+bool err_would_block(int err) { return err == EAGAIN || err == EWOULDBLOCK; }
+bool err_in_progress(int err) { return err == EINPROGRESS; }
+bool err_interrupted(int err) { return err == EINTR; }
+
+void ensure_winsock() {}
 
 void close_sock(int& s) {
     if (s != -1) {
@@ -22,6 +65,12 @@ void close_sock(int& s) {
         s = -1;
     }
 }
+
+void set_nonblocking(int s) {
+    int flags = ::fcntl(s, F_GETFL, 0);
+    ::fcntl(s, F_SETFL, flags | O_NONBLOCK);
+}
+#endif
 
 // Resolves host (synchronously — fine for an outbound client; the
 // reference C++ client uses a worker thread because it's tied to the
@@ -40,11 +89,6 @@ bool resolve(const std::string& host, uint16_t port, sockaddr_in& out) {
     std::memcpy(&out, res->ai_addr, sizeof(sockaddr_in));
     ::freeaddrinfo(res);
     return true;
-}
-
-void set_nonblocking(int s) {
-    int flags = ::fcntl(s, F_GETFL, 0);
-    ::fcntl(s, F_SETFL, flags | O_NONBLOCK);
 }
 
 } // namespace
@@ -70,26 +114,29 @@ void Client::close_with_error(const std::string& msg, ConnectionState target) {
 }
 
 void Client::connect() {
+    ensure_winsock();
     disconnect();
     sockaddr_in addr{};
     if (!resolve(cfg_.host, cfg_.port, addr)) {
         close_with_error("dns: cannot resolve " + cfg_.host, ConnectionState::Failed);
         return;
     }
-    int s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    int s = (int)::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (s < 0) {
-        close_with_error(std::string("socket: ") + std::strerror(errno),
+        close_with_error(std::string("socket: ") + net_strerror(net_errno()),
                          ConnectionState::Failed);
         return;
     }
     int one = 1;
-    ::setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+    ::setsockopt(s, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&one),
+                 sizeof(one));
     set_nonblocking(s);
 
     int rc = ::connect(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-    if (rc < 0 && errno != EINPROGRESS) {
-        ::close(s);
-        close_with_error(std::string("connect: ") + std::strerror(errno),
+    if (rc < 0 && !err_in_progress(net_errno())) {
+        int err = net_errno();
+        close_sock(s);
+        close_with_error(std::string("connect: ") + net_strerror(err),
                          ConnectionState::Failed);
         return;
     }
@@ -100,7 +147,11 @@ void Client::connect() {
 
 void Client::disconnect() {
     if (sock_ != -1) {
+#ifdef _WIN32
+        ::shutdown(sock_, SD_BOTH);
+#else
         ::shutdown(sock_, SHUT_RDWR);
+#endif
         close_sock(sock_);
     }
     rx_.clear();
@@ -119,21 +170,21 @@ bool Client::poll(std::chrono::milliseconds max_wait) {
     if (state_ == ConnectionState::Connecting) FD_SET(sock_, &wfds);
 
     timeval tv;
-    tv.tv_sec  = static_cast<time_t>(max_wait.count() / 1000);
-    tv.tv_usec = static_cast<suseconds_t>((max_wait.count() % 1000) * 1000);
+    tv.tv_sec  = static_cast<long>(max_wait.count() / 1000);
+    tv.tv_usec = static_cast<long>((max_wait.count() % 1000) * 1000);
     int n = ::select(sock_ + 1, &rfds, &wfds, nullptr, &tv);
     if (n < 0) {
-        if (errno == EINTR) return true;
-        close_with_error(std::string("select: ") + std::strerror(errno));
+        if (err_interrupted(net_errno())) return true;
+        close_with_error(std::string("select: ") + net_strerror(net_errno()));
         return false;
     }
 
     if (state_ == ConnectionState::Connecting && FD_ISSET(sock_, &wfds)) {
         int err = 0;
         socklen_t errlen = sizeof(err);
-        ::getsockopt(sock_, SOL_SOCKET, SO_ERROR, &err, &errlen);
+        ::getsockopt(sock_, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &errlen);
         if (err != 0) {
-            close_with_error(std::string("connect: ") + std::strerror(err),
+            close_with_error(std::string("connect: ") + net_strerror(err),
                              ConnectionState::Failed);
             return false;
         }
@@ -143,14 +194,14 @@ bool Client::poll(std::chrono::milliseconds max_wait) {
 
     if (FD_ISSET(sock_, &rfds)) {
         uint8_t tmp[2048];
-        ssize_t r = ::recv(sock_, tmp, sizeof(tmp), 0);
+        long r = static_cast<long>(::recv(sock_, reinterpret_cast<char*>(tmp), sizeof(tmp), 0));
         if (r == 0) {
             close_with_error("connection closed by peer");
             return false;
         }
         if (r < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) return true;
-            close_with_error(std::string("recv: ") + std::strerror(errno));
+            if (err_would_block(net_errno())) return true;
+            close_with_error(std::string("recv: ") + net_strerror(net_errno()));
             return false;
         }
         rx_.insert(rx_.end(), tmp, tmp + r);
@@ -277,9 +328,10 @@ void Client::send_raw(const std::vector<uint8_t>& payload) {
     auto frame = frame_encode(payload);
     size_t off = 0;
     while (off < frame.size()) {
-        ssize_t r = ::send(sock_, frame.data() + off, frame.size() - off, 0);
+        long r = static_cast<long>(::send(sock_, reinterpret_cast<const char*>(frame.data()) + off,
+                                          static_cast<int>(frame.size() - off), 0));
         if (r < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (err_would_block(net_errno())) {
                 fd_set wfds;
                 FD_ZERO(&wfds);
                 FD_SET(sock_, &wfds);
@@ -290,7 +342,7 @@ void Client::send_raw(const std::vector<uint8_t>& payload) {
                 }
                 continue;
             }
-            close_with_error(std::string("send: ") + std::strerror(errno));
+            close_with_error(std::string("send: ") + net_strerror(net_errno()));
             return;
         }
         off += static_cast<size_t>(r);

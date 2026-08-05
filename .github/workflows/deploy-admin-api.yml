@@ -115,6 +115,11 @@ jobs:
           grep -q 'LOBBY_MAP_API_URL=' /usr/local/sbin/silencer-fetch-secrets \
             && sudo sed -i 's|LOBBY_MAP_API_URL=.*|LOBBY_MAP_API_URL=http://lobby.silencer.internal:15172|' /usr/local/sbin/silencer-fetch-secrets \
             || sudo sed -i '/^ASSETS_DIR/a LOBBY_MAP_API_URL=http://lobby.silencer.internal:15172' /usr/local/sbin/silencer-fetch-secrets
+          grep -q 'LAUNCHER_DIR=/launcher' /usr/local/sbin/silencer-fetch-secrets || \
+            sudo sed -i '/^ASSETS_DIR/a LAUNCHER_DIR=/launcher' /usr/local/sbin/silencer-fetch-secrets
+          # The launcher manifests live outside any release artifact, so the dir
+          # must exist before the mount or Docker creates it root-owned.
+          sudo mkdir -p /var/lib/silencer/launcher
 
           # 3. Regenerate env file to pick up ASSETS_DIR immediately
           sudo /usr/local/sbin/silencer-fetch-secrets
@@ -131,6 +136,7 @@ jobs:
             --env-file /etc/silencer/admin-api.env \
             -v /var/lib/silencer-backups:/backups \
             -v /var/lib/silencer/assets:/assets \
+            -v /var/lib/silencer/launcher:/launcher \
             ${IMAGE}
           EOF
 
