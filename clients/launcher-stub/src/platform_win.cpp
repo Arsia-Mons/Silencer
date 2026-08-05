@@ -233,7 +233,7 @@ HRESULT CALLBACK td_cb(HWND hwnd, UINT msg, WPARAM wp, LPARAM, LONG_PTR ref) {
       SendMessageW(hwnd, TDM_SET_MARQUEE_PROGRESS_BAR, FALSE, 0);
       SendMessageW(hwnd, TDM_SET_PROGRESS_BAR_RANGE, 0, MAKELPARAM(0, 100));
       SendMessageW(hwnd, TDM_SET_ELEMENT_TEXT, TDE_MAIN_INSTRUCTION,
-                   (LPARAM)L"Updating Silencer Launcher...");
+                   (LPARAM)L"Updating...");
     }
     if (ctx->downloading_ui) {
       int pc = st.percent.load();

@@ -29,7 +29,7 @@ void stub::gui_run(GuiState &st) {
     if (z) {
       if (!downloading && st.phase.load() == kDownloading) {
         downloading = true;
-        if (fprintf(z, "# Updating Silencer Launcher...\n") < 0 ||
+        if (fprintf(z, "# Updating...\n") < 0 ||
             fflush(z) == EOF) {
           pclose(z);
           z = nullptr;

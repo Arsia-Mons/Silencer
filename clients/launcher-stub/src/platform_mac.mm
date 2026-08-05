@@ -62,8 +62,7 @@ void stub::gui_run(GuiState &st) {
                                    if (!downloading &&
                                        stp->phase.load() == kDownloading) {
                                      downloading = YES;
-                                     label.stringValue =
-                                         @"Updating Silencer Launcher...";
+                                     label.stringValue = @"Updating...";
                                    }
                                    if (downloading) {
                                      int pc = stp->percent.load();
