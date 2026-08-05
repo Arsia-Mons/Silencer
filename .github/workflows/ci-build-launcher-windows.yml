@@ -1,0 +1,57 @@
+name: CI Build (launcher, Windows)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-build-launcher-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-launcher-windows:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      # See ci-build-launcher-macos.yml for why the filter is gated inside the
+      # job and why clients/silencer/ subtrees are in the allowlist.
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            relevant:
+              - 'clients/launcher/**'
+              - 'clients/lobby-sdk/cpp/**'
+              - 'clients/silencer/src/ui/**'
+              - 'clients/silencer/src/render/cppx_ui/**'
+              - 'clients/silencer/src/client/ui/**'
+              - 'clients/silencer/src/updater/**'
+              - 'clients/silencer/src/platform/perf_trace.*'
+              - 'clients/silencer/third_party/**'
+              - 'clients/silencer/tools/cppx_transpile.py'
+              - 'shared/fonts/**'
+              - 'shared/assets/**'
+              - 'shared/icons/**'
+              - 'tests/e2e/check-bundle-windows.ps1'
+              - '.github/actions/build-launcher-windows/**'
+              - '.github/workflows/ci-build-launcher-windows.yml'
+
+      - name: Build launcher
+        if: steps.changes.outputs.relevant == 'true'
+        uses: ./.github/actions/build-launcher-windows
+
+      - name: Verify bundled dependencies
+        if: steps.changes.outputs.relevant == 'true'
+        shell: pwsh
+        run: pwsh tests/e2e/check-bundle-windows.ps1 -PackageDir build-launcher/package/silencer-launcher -ExeName silencer-launcher.exe
+
+      - if: steps.changes.outputs.relevant != 'true'
+        shell: bash
+        run: echo "No launcher/reused-source/asset changes; skipping launcher Windows build."

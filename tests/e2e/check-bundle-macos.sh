@@ -3,16 +3,26 @@
 # dylib reference (in the main binary and in each bundled dylib) must resolve
 # to a file inside Contents/Frameworks/.
 #
-# Usage: tests/e2e/check-bundle-macos.sh <path-to-Silencer.app>
+# Usage: tests/e2e/check-bundle-macos.sh <app> [exe-name] [helper-relpath]
+#
+# Defaults describe the game bundle, so the one-argument call is unchanged.
+# The launcher passes its own exe name (which contains a space — quote it) and
+# an empty helper path, because it has no nested helper binary:
+#
+#   check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher" ""
 set -euo pipefail
 
-APP="${1:?usage: $0 <path-to-Silencer.app>}"
-BINARY="$APP/Contents/MacOS/Silencer"
+APP="${1:?usage: $0 <app> [exe-name] [helper-relpath]}"
+EXE_NAME="${2:-Silencer}"
+HELPER_REL="${3-Contents/Helpers/updater-stage-2}"
+BINARY="$APP/Contents/MacOS/$EXE_NAME"
 FRAMEWORKS="$APP/Contents/Frameworks"
-HELPER="$APP/Contents/Helpers/updater-stage-2"
 
 [ -x "$BINARY" ] || { echo "no executable at $BINARY" >&2; exit 1; }
-[ -x "$HELPER" ] || { echo "no executable at $HELPER" >&2; exit 1; }
+if [ -n "$HELPER_REL" ]; then
+	HELPER="$APP/$HELPER_REL"
+	[ -x "$HELPER" ] || { echo "no executable at $HELPER" >&2; exit 1; }
+fi
 
 errors=0
 
@@ -56,7 +66,11 @@ check_file() {
 }
 
 check_file "$BINARY"
-check_file "$HELPER" 0
+if [ -n "$HELPER_REL" ]; then
+	# An `[ ... ] && check_file` one-liner would exit the script under set -e
+	# on the skip path, because the whole statement then returns 1.
+	check_file "$HELPER" 0
+fi
 
 if [ -d "$FRAMEWORKS" ]; then
 	while IFS= read -r dylib; do

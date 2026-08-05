@@ -1,7 +1,8 @@
 # .github/workflows/ — GitHub Actions
 
-Six CI builds (five required by branch protection on `main`,
-`build-linux` optional until added), three deploys, one release.
+Nine CI builds (five required by branch protection on `main`;
+`build-linux` and the three `build-launcher-*` are optional until
+added), three deploys, one release.
 Path filters for the CI builds live **inside the job**, not in
 `on:` — see "Required check trap" below.
 
@@ -21,6 +22,20 @@ protection settings if/when you want to gate merges on it.
 | `ci-build-admin-api.yml` | every PR + push to `main` | `services/admin-api/**`, root `package.json`, `bun.lock`, or this workflow |
 | `ci-build-admin-web.yml` | every PR + push to `main` | `web/admin/**`, `shared/gas-validation/**`, root `package.json`, `bun.lock`, or this workflow |
 | `ci-build-lobby-docker.yml` | every PR + push to `main` | `services/lobby/**`, `clients/silencer/**`, `shared/assets/**`, or this workflow |
+| `ci-build-launcher-{macos,windows,linux}.yml` | every PR + push to `main` | `clients/launcher/**`, `clients/lobby-sdk/cpp/**`, the **reused** `clients/silencer/src/{ui,render/cppx_ui,client/ui,updater}/**` subtrees, `shared/{fonts,assets,icons}/**`, or the matching action/workflow |
+
+The three launcher builds are **not required checks** — add them via
+branch protection if you want merges gated on them. They exist because
+`clients/launcher/CMakeLists.txt` compiles those `clients/silencer/`
+subtrees **by absolute path**, so a change there can break the launcher
+while every game check stays green. Nothing else catches that. They run
+the same composite actions `release.yml` does, so a CI pass means the
+release build works.
+
+`ci-build-launcher-macos.yml` runs on `macos-latest`, not the `macos-15`
+`release.yml` pins. Deliberate: the newer dyld is the one that
+hard-aborts on a duplicate `LC_RPATH`, so CI is where
+`package-macos.sh`'s dedupe gets proven.
 
 macOS / Windows / Linux denylist (skip the build when **only**
 these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
@@ -76,8 +91,10 @@ the launcher has no self-updater yet
 - `build-launcher-linux` bundles SDL3 with `patchelf --set-rpath
   '$ORIGIN'` and tars it.
 
-None of the launcher jobs has a **PR CI counterpart**, so they first
-run on a real tag. Add one before relying on a release.
+Each launcher release job has a PR CI counterpart
+(`ci-build-launcher-*.yml`) running the same composite action, so the
+build path is exercised on every relevant PR. The signing, notarization
+and DMG steps are still tag-only — CI has no Apple secrets.
 
 `publish-npm` requires the `NPM_TOKEN` secret (granular publish
 token for the `arsia-mons` scope + the unscoped `silencer-tui`

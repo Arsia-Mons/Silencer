@@ -134,6 +134,19 @@ entry that newer dyld hard-aborts on, re-signs, and **fails the script** if any
 `.github/actions/build-silencer-macos/action.yml`, which does the same for the
 game — keep the two in step.
 
+## CI
+
+`ci-build-launcher-{macos,windows,linux}.yml` build the launcher on every
+relevant PR, through the **same composite actions** `release.yml` uses, then
+run `tests/e2e/check-bundle-*` over the result. Their path allowlist includes
+the `clients/silencer/` subtrees this `CMakeLists.txt` compiles by absolute
+path — a change there can break the launcher while every game check stays
+green, and nothing else catches it. Not required checks yet.
+
+Those three `check-bundle-*` scripts are the game's, given a defaulted
+exe-name argument (and, on macOS, a helper path the launcher passes empty). A
+one-argument call still behaves exactly as before.
+
 ## Distribution
 
 Three release jobs in `release.yml`, one per platform, each on a `v*` tag
