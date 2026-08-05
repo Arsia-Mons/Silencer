@@ -79,9 +79,16 @@ sha256 tool. `tests/payload/` is a stand-in payload whose identity and
 exit code come from files beside its binary.
 
 Env overrides (all read by the stub): `SILENCER_STUB_STORE`,
-`SILENCER_STUB_MANIFEST_URL`, `SILENCER_STUB_NO_GUI=1`. The manifest
-URL otherwise comes from `launcher.json`'s `manifest_url_launcher`,
+`SILENCER_STUB_MANIFEST_URL`, `SILENCER_STUB_NO_GUI=1`, and
+`SILENCER_STUB_SLOW_MS=N` (dev/demo: hold the checking phase N ms and
+throttle the download so the GUI is watchable). The manifest URL
+otherwise comes from `launcher.json`'s `manifest_url_launcher`,
 defaulting to the GitHub `update-launcher.json`.
+
+To *see* the GUI end-to-end, `bash tests/e2e/demo.sh [slow-ms]` stages
+a fake ~10MB update on loopback and runs the stub with its window:
+marquee "Checking..." → determinate "Updating... N%" → the test payload
+starts.
 
 ## Gotchas
 

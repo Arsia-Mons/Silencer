@@ -235,6 +235,14 @@ void prune(const Store &store, const std::string &keep1, const std::string &keep
   }
 }
 
+// Dev/demo knob: SILENCER_STUB_SLOW_MS=N holds the checking phase for N ms
+// and throttles the download (N/100 ms per chunk) so the GUI is watchable.
+// Unset (the default) means zero delay everywhere.
+int slow_ms() {
+  static int v = atoi(stub::env_str("SILENCER_STUB_SLOW_MS").c_str());
+  return v > 0 ? v : 0;
+}
+
 // ---------------- the update ----------------
 struct Fresh {
   bool applied = false;
@@ -251,6 +259,8 @@ Fresh try_update(stub::GuiState &st, const Store &store, const std::string &cur)
     stub::logf("manifest url not allowed: %s", url.c_str());
     return fresh;
   }
+  if (slow_ms() > 0) // let the "Checking..." marquee be seen
+    std::this_thread::sleep_for(std::chrono::milliseconds(slow_ms()));
   std::string body;
   stub::HttpResult r = stub::http_get_text(
       url, 3000, &body, [&](uint64_t, uint64_t) { return !st.cancel.load(); });
@@ -295,6 +305,8 @@ Fresh try_update(stub::GuiState &st, const Store &store, const std::string &cur)
   r = stub::http_download(dl_url, S(archive), [&](uint64_t got, uint64_t total) {
     if (total)
       st.percent = (int)(got * 100 / total);
+    if (slow_ms() > 0)
+      std::this_thread::sleep_for(std::chrono::milliseconds(slow_ms() / 100));
     return !st.cancel.load();
   });
   if (!r.ok) {
