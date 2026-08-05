@@ -137,6 +137,20 @@ $InstallDir = Join-Path $Work "install"
 New-Item -ItemType Directory -Force -Path $HostDir, $InstallDir | Out-Null
 
 $http = $null; $old = $null; $CtrlQ = 0; $exit = 1
+$OldLog = $null; $OldErrLog = $null; $HttpLog = $null
+
+# Every failure path dumps what the client and the server actually said. The
+# `[updater]` lines name the cause; without them a Windows failure is just
+# "the client did not exit", which is the symptom of everything.
+function Dump-ClientLogs {
+    foreach ($pair in @(@("OLD client stderr", $OldErrLog), @("OLD client stdout", $OldLog),
+                        @("http server", $HttpLog))) {
+        if ($pair[1] -and (Test-Path $pair[1])) {
+            Write-Host "--- $($pair[0]) (tail) ---"
+            Get-Content $pair[1] -Tail 30
+        }
+    }
+}
 try {
     Write-Host "=== staging NEW ($NewVer) update package ==="
     $newPkg = Join-Path $Work "new-pkg"
@@ -155,18 +169,47 @@ try {
     $oldDir = Split-Path $oldBin -Parent
 
     $HttpPort = Pick-Port
+    $HttpLog = Join-Path $Work "http.log"
     Write-Host "=== HTTP server on :$HttpPort serving $HostDir ==="
-    $http = Start-Process -PassThru -WindowStyle Hidden python -ArgumentList "-m", "http.server", "$HttpPort" -WorkingDirectory $HostDir
+    $http = Start-Process -PassThru -WindowStyle Hidden python -ArgumentList "-m", "http.server", "$HttpPort" `
+        -WorkingDirectory $HostDir -RedirectStandardError $HttpLog
 
     $CtrlP = Pick-Port   # OLD client, driven by us (flag)
     $CtrlQ = Pick-Port   # relaunched NEW client, observed by us (env)
     $url = "http://127.0.0.1:$HttpPort/$ZipName"
 
+    # Mirror of the macOS gate (see test-updater.sh): the server must be
+    # ANSWERING before the client is told to download from it, and a server that
+    # never comes up has to say so instead of surfacing as a failed self-update.
+    Write-Host "=== waiting for the HTTP server to answer ==="
+    $served = $false
+    for ($i = 0; $i -lt 300; $i++) {
+        try {
+            Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 2 -UseBasicParsing | Out-Null
+            $served = $true; break
+        } catch { }
+        if ($http.HasExited) { break }
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not $served) {
+        Write-Host "--- http server log ---"
+        if (Test-Path $HttpLog) { Get-Content $HttpLog -Tail 20 }
+        throw "the test's own HTTP server never served $url — this is the harness, not the updater"
+    }
+    Write-Host "HTTP server is serving $url"
+
     Write-Host "=== launching OLD client (drive-port=$CtrlP, relaunch-env-port=$CtrlQ) ==="
     $env:SILENCER_HEADLESS = "1"
     $env:SILENCER_CONTROL_PORT = "$CtrlQ"
+    # Capture the client's own output. Without this the Windows job fails blind:
+    # every `throw` below reported only that the client had not exited, while
+    # the `[updater]` lines that say WHY went nowhere. The macOS harness has
+    # always kept this log; Windows never did (issue #341).
+    $OldLog = Join-Path $Work "old.log"
+    $OldErrLog = Join-Path $Work "old.err.log"
     $old = Start-Process -PassThru -WindowStyle Hidden -FilePath $oldBin `
-        -ArgumentList "--headless", "--control-port", "$CtrlP" -WorkingDirectory $oldDir
+        -ArgumentList "--headless", "--control-port", "$CtrlP" -WorkingDirectory $oldDir `
+        -RedirectStandardOutput $OldLog -RedirectStandardError $OldErrLog
     # Clear from THIS session so our own CLI calls don't default to Q (we always
     # pass --port, but keep it tidy). OLD already captured the env at launch, so
     # the relaunched NEW still inherits it.
@@ -188,7 +231,10 @@ try {
 
     Write-Host "=== waiting for OLD client to exit (stage-2 spawned) ==="
     for ($i = 0; $i -lt 120; $i++) { if ($old.HasExited) { break }; Start-Sleep -Milliseconds 500 }
-    if (-not $old.HasExited) { throw "OLD client did not exit — stage-2 handoff never happened" }
+    if (-not $old.HasExited) {
+        Dump-ClientLogs
+        throw "OLD client did not exit — stage-2 handoff never happened"
+    }
     $old = $null
     Write-Host "OLD client exited; awaiting auto-relaunched NEW client on :$CtrlQ"
 
@@ -202,6 +248,7 @@ try {
         $exit = 0
     } else {
         Write-Host "FAIL: relaunched client never reported NEW version $NewVer (last ping: '$final')" -ForegroundColor Red
+        Dump-ClientLogs
         $log = Join-Path $env:TEMP "silencer-update.log"
         if (Test-Path $log) { Write-Host "--- stage-2 log ---"; Get-Content $log -Tail 30 }
         $exit = 1
