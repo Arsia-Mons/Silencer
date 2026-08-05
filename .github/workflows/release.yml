@@ -3,6 +3,10 @@ name: Release
 on:
   push:
     tags: ['v*']
+  schedule:
+    # Nightly, 07:00 UTC. Builds main and republishes the `latest` prerelease.
+    # Skipped when main has not moved since the last one — see the version job.
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -10,6 +14,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The single source of the two version strings, so the eight build jobs below
+  # cannot drift and the tag/non-tag split is decided in exactly one place.
+  #
+  # `protocol` is the wire protocol number. The lobby compares it against every
+  # connecting client (services/lobby/client.go:157), so a nightly must NEVER
+  # invent a new one: the moment the lobby redeployed at it, every stable client
+  # would be rejected. A nightly therefore reuses the checked-in number.
+  #
+  # `build_id` is the build's own identity, and the only thing self-update
+  # compares. On a tag the two are equal.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      protocol: ${{ steps.v.outputs.protocol }}
+      build_id: ${{ steps.v.outputs.build_id }}
+      channel: ${{ steps.v.outputs.channel }}
+      skip: ${{ steps.v.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve versions
+        id: v
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            protocol="${GITHUB_REF_NAME#v}"
+            build_id="$protocol"
+            channel=stable
+            skip=false
+          else
+            # Read the protocol number from the tree rather than the ref. A
+            # branch ref is not a version: the old `${GITHUB_REF_NAME#v}` here
+            # yielded the literal string "main", which the Windows VERSIONINFO
+            # quad cannot represent and CFBundleShortVersionString rejects.
+            protocol="$(sed -n 's/^set(SILENCER_VERSION "\([0-9]\{1,\}\)".*/\1/p' \
+                        clients/silencer/CMakeLists.txt | head -1)"
+            if [[ -z "$protocol" ]]; then
+              echo "could not read SILENCER_VERSION from clients/silencer/CMakeLists.txt" >&2
+              exit 1
+            fi
+            build_id="${protocol}+nightly.$(date -u +%Y%m%d).${GITHUB_SHA::7}"
+            channel=nightly
+            skip=false
+            # A scheduled run with nothing new to ship is wasted three-platform
+            # build time and a wasted notarization round-trip. Manual dispatch
+            # always builds, so there is a way to force one.
+            if [[ "${GITHUB_EVENT_NAME}" == schedule ]]; then
+              last="$(git rev-list -n1 --before='24 hours ago' HEAD || true)"
+              if [[ -n "$last" && "$last" == "$(git rev-parse HEAD)" ]]; then
+                echo "main has not moved in 24h; skipping nightly"
+                skip=true
+              fi
+            fi
+          fi
+          echo "protocol=$protocol" >> "$GITHUB_OUTPUT"
+          echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "protocol=$protocol build_id=$build_id channel=$channel skip=$skip"
+
   build-macos:
     # Pinned to macos-15 (arm64): macos-latest migrated to macOS 26 (2026-06-15),
     # whose stricter dyld (duplicate LC_RPATH abort) + local-network/loopback
@@ -18,13 +84,14 @@ jobs:
     # (issue #321).
     runs-on: macos-15
     timeout-minutes: 45
+    needs: version
+    if: needs.version.outputs.skip != 'true'
     env:
       SCCACHE_GHA_ENABLED: "true"
+      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
+      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute version from tag
-        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Install create-dmg
         # Release-only; the shared composite installs minizip + dylibbundler.
@@ -179,13 +246,14 @@ jobs:
     # DMG and nothing else.
     runs-on: macos-15
     timeout-minutes: 45
+    needs: version
+    if: needs.version.outputs.skip != 'true'
     env:
       SCCACHE_GHA_ENABLED: "true"
+      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
+      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute version from tag
-        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Install create-dmg
         # Release-only; the composite installs dylibbundler.
@@ -195,6 +263,7 @@ jobs:
         uses: ./.github/actions/build-launcher-macos
         with:
           launcher-version: ${{ env.SILENCER_VERSION }}
+          launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
           build-dir: build-launcher
 
       - name: Import Developer ID cert
@@ -306,19 +375,20 @@ jobs:
   build-launcher-windows:
     runs-on: windows-latest
     timeout-minutes: 60
+    needs: version
+    if: needs.version.outputs.skip != 'true'
     env:
       SCCACHE_GHA_ENABLED: "true"
+      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
+      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute version from tag
-        shell: bash
-        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Build launcher
         uses: ./.github/actions/build-launcher-windows
         with:
           launcher-version: ${{ env.SILENCER_VERSION }}
+          launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
           build-dir: build-launcher
 
       - name: Zip portable bundle
@@ -356,18 +426,20 @@ jobs:
   build-launcher-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: version
+    if: needs.version.outputs.skip != 'true'
     env:
       SCCACHE_GHA_ENABLED: "true"
+      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
+      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute version from tag
-        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Build launcher
         uses: ./.github/actions/build-launcher-linux
         with:
           launcher-version: ${{ env.SILENCER_VERSION }}
+          launcher-build-id: ${{ env.SILENCER_BUILD_ID }}
           build-dir: build-launcher
 
       - name: Package
@@ -382,14 +454,14 @@ jobs:
   build-windows:
     runs-on: windows-latest
     timeout-minutes: 60
+    needs: version
+    if: needs.version.outputs.skip != 'true'
     env:
       SCCACHE_GHA_ENABLED: "true"
+      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
+      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute version from tag
-        shell: bash
-        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Build silencer
         uses: ./.github/actions/build-silencer-windows
@@ -444,13 +516,14 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: version
+    if: needs.version.outputs.skip != 'true'
     env:
       SCCACHE_GHA_ENABLED: "true"
+      SILENCER_VERSION: ${{ needs.version.outputs.protocol }}
+      SILENCER_BUILD_ID: ${{ needs.version.outputs.build_id }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute version from tag
-        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Build silencer
         uses: ./.github/actions/build-silencer-linux
@@ -469,15 +542,21 @@ jobs:
 
   release:
     needs:
+      - version
       - build-macos
       - build-launcher-macos
       - build-windows
       - build-launcher-windows
       - build-linux
       - build-launcher-linux
+    if: needs.version.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      PROTOCOL: ${{ needs.version.outputs.protocol }}
+      BUILD_ID: ${{ needs.version.outputs.build_id }}
+      CHANNEL: ${{ needs.version.outputs.channel }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -492,9 +571,41 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
           else
             echo "tag=latest" >> $GITHUB_OUTPUT
-            echo "name=Latest master (${GITHUB_SHA::8})" >> $GITHUB_OUTPUT
+            echo "name=Nightly ${BUILD_ID}" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
           fi
+
+      - name: Build update manifest
+        # The manifest nothing generated before this, which is why the lobby's
+        # -update-manifest path and the launcher's manifest_url_* both resolved
+        # to a 404 in production. Shape must match services/lobby/update.go's
+        # manifestFile, plus build_id, which only the launcher reads.
+        #
+        # `version` stays the wire protocol number because the lobby refuses to
+        # hand out update URLs unless it equals the version it is enforcing
+        # (services/lobby/client.go:161). `build_id` is what distinguishes two
+        # nightlies, so it is what the launcher compares.
+        run: |
+          set -euo pipefail
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.meta.outputs.tag }}"
+          mac_zip=artifacts/macos-arm64/silencer-macos-arm64.zip
+          win_zip=artifacts/windows-x64/silencer-windows-x64.zip
+          for f in "$mac_zip" "$win_zip"; do
+            [[ -f "$f" ]] || { echo "missing artifact: $f" >&2; exit 1; }
+          done
+          jq -n \
+            --arg version    "$PROTOCOL" \
+            --arg build_id   "$BUILD_ID" \
+            --arg channel    "$CHANNEL" \
+            --arg macos_url  "$base/silencer-macos-arm64.zip" \
+            --arg macos_sha  "$(sha256sum "$mac_zip" | cut -d' ' -f1)" \
+            --arg win_url    "$base/silencer-windows-x64.zip" \
+            --arg win_sha    "$(sha256sum "$win_zip" | cut -d' ' -f1)" \
+            '{version: $version, build_id: $build_id, channel: $channel,
+              macos_url: $macos_url, macos_sha256: $macos_sha,
+              windows_url: $win_url, windows_sha256: $win_sha}' \
+            > update.json
+          cat update.json
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -513,6 +624,7 @@ jobs:
             artifacts/launcher-windows-x64-setup/*
             artifacts/linux-x64/*
             artifacts/launcher-linux-x64/*
+            update.json
           body: |
             ## Downloads — game
 

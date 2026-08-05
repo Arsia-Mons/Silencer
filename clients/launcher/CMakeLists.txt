@@ -23,6 +23,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # local build the same way the client's SILENCER_VERSION default does.
 set(SILENCER_LAUNCHER_VERSION "00000" CACHE STRING "Launcher version (from the git tag)")
 
+# The build's own identity, which is NOT the version above. The version is a
+# bare counter because CFBundleShortVersionString and the Windows VERSIONINFO
+# quad both have to parse as a number; two nightlies built a day apart from the
+# same counter are indistinguishable by it. The build id carries what tells them
+# apart (`00058+nightly.20260805.a1b2c3d`) and is the only thing self-update
+# compares. A stable release sets it to the version, so the two agree there.
+set(SILENCER_LAUNCHER_BUILD_ID "${SILENCER_LAUNCHER_VERSION}"
+    CACHE STRING "Launcher build identity (version, or version+nightly.DATE.SHA)")
+
 # Info.plist reads this for LSMinimumSystemVersion, so it must have a value even
 # in a plain local build. 11.0 matches the client's release configure.
 if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
@@ -249,7 +258,8 @@ endif()
 
 target_compile_definitions(silencer-launcher PRIVATE
   LAUNCHER_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../shared/fonts"
-  LAUNCHER_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../shared/assets")
+  LAUNCHER_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../shared/assets"
+  SILENCER_LAUNCHER_BUILD_ID="${SILENCER_LAUNCHER_BUILD_ID}")
 
 # --- Resource staging ---------------------------------------------------------
 # An installed launcher has no source tree, so the fonts and the sprite banks it

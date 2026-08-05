@@ -55,9 +55,52 @@ these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 
 | Workflow | Triggers (`on:`) |
 |---|---|
-| `release.yml` | push of `v*` tag, or manual dispatch |
+| `release.yml` | push of `v*` tag, nightly cron (07:00 UTC), or manual dispatch |
 
-`release.yml` jobs: six parallel builds — `build-macos`,
+### The `version` job — two version strings, not one
+
+Every build job takes its versions from the single `version` job. It
+emits **two** strings, and conflating them is the trap it exists to
+prevent:
+
+- **`protocol`** — the wire protocol number (`00058`). The lobby
+  compares it against every connecting client
+  (`services/lobby/client.go:157`). A nightly **never** invents a new
+  one: the moment the lobby redeployed at it, every stable client would
+  be rejected. On a non-tag ref it is read out of
+  `clients/silencer/CMakeLists.txt`, not the ref.
+- **`build_id`** — the build's own identity
+  (`00058+nightly.20260805.a1b2c3d`), and the only thing self-update
+  compares. On a tag the two are equal.
+
+The number stays out of `build_id` because
+`CFBundleShortVersionString` and the Windows VERSIONINFO quad both have
+to parse as a number — `clients/launcher/CMakeLists.txt` falls back to
+`0.0.0.0` for anything non-numeric. So the launcher takes both:
+`launcher-version` (numeric, stamped into the plist and the resource)
+and `launcher-build-id` (the identity, a compile define).
+
+Before this job existed each build job ran its own
+`SILENCER_VERSION=${GITHUB_REF_NAME#v}`, which on a branch ref yielded
+the literal string `main`. That path had never been exercised.
+
+**Nightlies skip when `main` has not moved** in 24h — a scheduled run
+with nothing to ship costs three platform builds and a notarization
+round-trip. `workflow_dispatch` always builds, so a nightly can be
+forced. Nightlies publish to the `latest` prerelease tag; `publish-npm`
+stays tag-only.
+
+### `update.json`
+
+The `release` job generates the update manifest from the built
+artifacts (per-platform URL + sha256) and uploads it as a release asset.
+Nothing generated it before, which is why the lobby's
+`-update-manifest` path and the launcher's `manifest_url_*` both
+resolved to a 404 in production. Its shape is
+`services/lobby/update.go`'s `manifestFile` plus `build_id` and
+`channel`, which only the launcher reads; Go ignores the extra fields.
+
+`release.yml` jobs: a `version` job, then six parallel builds — `build-macos`,
 `build-windows`, `build-linux` for the game and
 `build-launcher-macos`, `build-launcher-windows`,
 `build-launcher-linux` for the launcher

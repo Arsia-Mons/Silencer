@@ -5,6 +5,9 @@ inputs:
   launcher-version:
     description: SILENCER_LAUNCHER_VERSION cmake define. release.yml passes the git tag with its leading v stripped; it reaches the exe through resources.rc's VERSIONINFO.
     default: "00000"
+  launcher-build-id:
+    description: Build identity stamped in as SILENCER_LAUNCHER_BUILD_ID. Distinct from launcher-version, which must stay numeric for the VERSIONINFO quad; this is what self-update compares. Defaults to the version for a stable build.
+    default: "00000"
   build-dir:
     description: Where to configure the build. Kept out of the game's build/ so both jobs can run from one checkout.
     default: build-launcher
@@ -57,6 +60,7 @@ runs:
       env:
         VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache-launcher,readwrite"
         LAUNCHER_VERSION_INPUT: ${{ inputs.launcher-version }}
+        LAUNCHER_BUILD_ID_INPUT: ${{ inputs.launcher-build-id }}
         BUILD_DIR: ${{ inputs.build-dir }}
       run: |
         cmake -B "$env:BUILD_DIR" -S clients/launcher `
@@ -66,7 +70,8 @@ runs:
           -DVCPKG_TARGET_TRIPLET=x64-windows `
           -DCMAKE_C_COMPILER_LAUNCHER=sccache `
           -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
-          -DSILENCER_LAUNCHER_VERSION="$env:LAUNCHER_VERSION_INPUT"
+          -DSILENCER_LAUNCHER_VERSION="$env:LAUNCHER_VERSION_INPUT" `
+          -DSILENCER_LAUNCHER_BUILD_ID="$env:LAUNCHER_BUILD_ID_INPUT"
 
     - name: Build
       shell: pwsh

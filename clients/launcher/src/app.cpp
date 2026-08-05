@@ -361,7 +361,15 @@ void App::run_refresh() {
     if (!body.empty()) {
       try {
         json j = json::parse(body);
-        version = j.value("version", std::string());
+        // `version` is the wire protocol number; the lobby compares it against
+        // every connecting client, so it must stay the protocol number and
+        // cannot also carry a per-build identity. `build_id` is that identity:
+        // two nightlies share a protocol number but never a build_id, which is
+        // what makes nightly-to-nightly updates detectable. Manifests published
+        // before build_id existed carry only `version`, so fall back to it.
+        version = j.value("build_id", std::string());
+        if (version.empty())
+          version = j.value("version", std::string());
 #ifdef _WIN32
         dl_url = j.value("windows_url", std::string());
         sha = to_lower(j.value("windows_sha256", std::string()));

@@ -5,6 +5,9 @@ inputs:
   launcher-version:
     description: Version stamped into CFBundleShortVersionString / CFBundleVersion. release.yml passes the git tag with its leading v stripped.
     default: "00000"
+  launcher-build-id:
+    description: Build identity stamped in as SILENCER_LAUNCHER_BUILD_ID. Distinct from launcher-version, which must stay numeric for CFBundleShortVersionString; this is what self-update compares. Defaults to the version for a stable build.
+    default: "00000"
   build-dir:
     description: Where to configure the build. Kept out of the game's build/ so both jobs can run from one checkout.
     default: build-launcher
@@ -34,6 +37,7 @@ runs:
       shell: bash
       env:
         LAUNCHER_VERSION_INPUT: ${{ inputs.launcher-version }}
+        LAUNCHER_BUILD_ID_INPUT: ${{ inputs.launcher-build-id }}
         BUILD_DIR: ${{ inputs.build-dir }}
       run: |
         cmake -B "$BUILD_DIR" -S clients/launcher \
@@ -41,7 +45,8 @@ runs:
           -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
           -DCMAKE_C_COMPILER_LAUNCHER=sccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-          -DSILENCER_LAUNCHER_VERSION="$LAUNCHER_VERSION_INPUT"
+          -DSILENCER_LAUNCHER_VERSION="$LAUNCHER_VERSION_INPUT" \
+          -DSILENCER_LAUNCHER_BUILD_ID="$LAUNCHER_BUILD_ID_INPUT"
 
     - name: Build
       shell: bash
