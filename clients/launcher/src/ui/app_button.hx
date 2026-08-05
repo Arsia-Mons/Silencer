@@ -20,6 +20,7 @@ namespace launcher {
 enum class ButtonVariant : uint8_t {
   Chrome,      // ghost outline: drop-up actions, link chips, sign in/out
   Chip,        // Chrome laid out as a row: the topbar's account chip
+  UpdateChip,  // filled accent chip: the topbar's self-update affordance
   Primary,     // filled accent: the playbar's PLAY / INSTALL
   Tab,         // NEWS | RELEASES | SETTINGS segment
   Segment,     // the playbar's channel face, left of Primary

@@ -1,6 +1,8 @@
 # Launcher self-update: Sparkle vs. reusing `clients/silencer/src/updater/`
 
-Status: **proposal, nothing built.** Issue #338, task 7.
+Status: **built** (Option B, issue #343). This document stays as the
+decision record. One prediction did not survive contact with the code
+and is corrected below: `updaterstage2.cpp` IS reused verbatim.
 
 The launcher installs and updates the *game*. Nothing updates the
 *launcher*. A user who drags `Silencer Launcher.app` out of the DMG keeps
@@ -17,7 +19,7 @@ The install path the launcher runs today is already most of an updater:
 | HTTPS download with progress + cancel | `updaterdownload.cpp` | yes, compiled in |
 | SHA-256 verify | `updatersha256.cpp` | yes, compiled in |
 | Zip extract (`ditto` on macOS) | `updaterzip.cpp` | yes, compiled in |
-| Replace a **running** bundle and relaunch | `updaterstage2.cpp` (658 lines) + the signed `Contents/Helpers/updater-stage-2` binary | **no** |
+| Replace a **running** bundle and relaunch | `updaterstage2.cpp` (658 lines) + the signed `Contents/Helpers/updater-stage-2` binary | yes (issue #343) |
 
 Only the last row is missing. Everything above it is code the launcher
 links today, because installing the game needs exactly the same steps.
@@ -91,10 +93,14 @@ the game already does.
   DMG. The game's version of this is battle-tested by the release e2e;
   the launcher's would need its own.
 - No EdDSA. See the mitigation below.
-- `updaterstage2.cpp` cannot be reused verbatim — it is written against
-  the game's bundle layout and its `--self-update-stage2` argv contract.
-  Expect an adapted copy, not a shared file, since
-  `clients/silencer/` is off limits to edits from here.
+- ~~`updaterstage2.cpp` cannot be reused verbatim — expect an adapted
+  copy.~~ **Wrong, and important:** every path stage-2 acts on arrives
+  through argv (`--zip`, `--install-dir`, `--pid`, `--relaunch`), and
+  `ResolveInstallDir` only strips `/Contents/MacOS`. Nothing in it is
+  specific to the game's bundle. The launcher compiles it in unchanged
+  and only needed its own `Contents/Helpers/updater-stage-2` binary at
+  the path `Launch()` hardcodes. A fork would have been 658 lines of
+  the most brick-prone code in the tree, duplicated.
 
 ## Recommendation: **Option B**, with a signature check added
 
@@ -117,18 +123,27 @@ because the attacker cannot produce a bundle signed by our Developer ID.
 That closes the gap the SHA-256-over-TLS chain leaves open, in a few
 lines, using the signing we are already doing for Gatekeeper.
 
-## Sketch of the work, if approved
+## The work, as built (issue #343)
 
 1. `manifest_url_launcher` in `launcher.json` +
-   `/api/launcher/manifest/self` in `services/admin-api`.
-2. Publish `silencer-launcher-macos-arm64.zip` alongside the DMG in
-   `release.yml` — stage-2 consumes a zip, exactly as the game's does.
-3. `src/selfupdate.{h,cpp}` in `clients/launcher/`: an adapted stage-2
-   that verifies the Developer ID requirement above, swaps the bundle,
-   and relaunches.
-4. A `Contents/Helpers/launcher-stage-2` target, signed and notarized by
-   the CI job the same way the game's helper is.
-5. An e2e mirroring `infra/scripts/test-updater.sh`: build a
-   `99999`-versioned launcher, have the shipped one update to it
-   headlessly, assert the relaunched process reports 99999. Given the
-   no-fallback risk above, this gate is not optional.
+   `/api/launcher/manifest/self` in `services/admin-api`. Done earlier.
+2. `release.yml` publishes `silencer-launcher-macos-arm64.zip` (zipped
+   after stapling) + `update-launcher.json`. Done earlier.
+3. The flow in `src/app.cpp`: fetch the manifest, compare its
+   `build_id` against the compiled-in `SILENCER_LAUNCHER_BUILD_ID`,
+   download, verify sha256, verify the Developer ID requirement above
+   on the extracted bundle, then hand the zip to the unmodified
+   `UpdaterStage2::Launch`. The team ID for the requirement comes from
+   the running bundle's own signature, not a build knob — a signed
+   release enforces it automatically, and an unsigned build (dev, the
+   e2e) has nothing to enforce and skips it.
+4. A `Contents/Helpers/updater-stage-2` target (the exact name
+   `Launch()` hardcodes), signed and notarized by the release job the
+   same way the game's helper is.
+5. `infra/scripts/test-launcher-updater.sh`, a `release.yml` gate on
+   `build-launcher-macos`: the just-built launcher self-updates to a
+   `99999`-versioned build headlessly, and the test asserts the
+   auto-relaunched process reports the new build id. Given the
+   no-fallback risk above, this gate is not optional. It waits for its
+   own HTTP server before it drives the launcher (the #341/#342
+   lesson) and captures the child's stderr.

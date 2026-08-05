@@ -8,6 +8,8 @@ build-launcher/
 e2e-build-old/
 e2e-build-new/
 e2e-build-tests/
+e2e-build-launcher-old/
+e2e-build-launcher-new/
 clients/silencer/build-release/
 clients/silencer/build-unity/
 clients/silencer/build-headless/

@@ -184,8 +184,10 @@ path — a change there can break the launcher while every game check stays
 green, and nothing else catches it. Not required checks yet.
 
 Those three `check-bundle-*` scripts are the game's, given a defaulted
-exe-name argument (and, on macOS, a helper path the launcher passes empty). A
-one-argument call still behaves exactly as before.
+exe-name argument. On macOS the defaulted helper path also applies: the
+launcher ships the same nested `Contents/Helpers/updater-stage-2`, so the
+check asserts it exists and stays dependency-free. A one-argument call still
+behaves exactly as before.
 
 ## Distribution
 
@@ -272,12 +274,35 @@ is a run-from-anywhere bundle, not a distro package.
 
 ### Self-update
 
-The launcher does not update itself yet. The mechanism decision (Sparkle vs.
-adapting `clients/silencer/src/updater/`) is written up in
-[`../../docs/plans/2026-08-04-launcher-self-update.md`](../../docs/plans/2026-08-04-launcher-self-update.md)
-— recommendation: adapt the existing updater, plus a Developer ID requirement
-check on the staged bundle to recover the payload-signing property Sparkle
-would have given. Nothing is built.
+The launcher updates itself, macOS-only (the manifest carries no
+Windows/Linux URL on purpose — those stage-2 branches compile but nothing has
+exercised them). The mechanism decision is
+[`../../docs/plans/2026-08-04-launcher-self-update.md`](../../docs/plans/2026-08-04-launcher-self-update.md).
+The flow, all in `src/app.cpp` + `main.cpp`:
+
+1. `run_refresh` fetches `manifest_url_launcher` and compares the manifest's
+   `build_id` (never `version` — two nightlies share the protocol number)
+   against the compiled-in `SILENCER_LAUNCHER_BUILD_ID`.
+2. A mismatch with a `macos_url` shows the topbar's `UpdateChip` AppButton.
+   Click → `App::self_update()`: download, sha256 verify, then the Developer
+   ID check — the payload-signing property Sparkle would have given. The
+   requirement's team ID comes from the running bundle's own signature, so a
+   signed release enforces it automatically and an unsigned build (dev, e2e)
+   skips it.
+3. The worker flips to `Ready`; the main loop calls `App::pump_self_update()`
+   (the stage-2 fork happens on the main thread, mirroring the game's
+   `PumpStage2`), then exits on `Spawned` so stage-2 can swap the bundle and
+   relaunch it.
+
+Stage-2 itself is the game's `updaterstage2.cpp`, reused verbatim — every
+path arrives through argv, nothing in it is game-specific. The launcher only
+adds its own `Contents/Helpers/updater-stage-2` helper target (the exact path
+macOS `Launch()` hardcodes; never synthesize a temp `.app` at runtime —
+Gatekeeper assesses that as newly downloaded code). `release.yml` signs and
+notarizes the helper like the game's, and gates the launcher release on
+`infra/scripts/test-launcher-updater.sh` — a headless e2e where the just-built
+launcher self-updates to a `99999` build and the auto-relaunched process
+must report the new build id.
 
 ## Run
 
@@ -322,6 +347,10 @@ Env overrides (all optional):
   `go run ./services/lobby -addr :15170 ...`).
 - `SILENCER_LAUNCHER_TEST_INSTALL=<channel>` — shot-mode only: run the real
   download→verify→extract flow on startup.
+- `SILENCER_LAUNCHER_TEST_SELF_UPDATE=1` — shot-mode only: run the real
+  self-update flow on startup (manifest compare → download → verify →
+  stage-2 swap → auto-relaunch). Safe on the relaunched build: its build id
+  matches the manifest, so the flow stops at "already up to date".
 - `SILENCER_LAUNCHER_PERF_SCALE=<f>` + `SILENCER_LAUNCHER_PERF_FRAMES=<n>` —
   frame-cost measurement: raster at `f`× the logical size (synthetic HiDPI),
   inject a focus-nav repaint every 30 frames, quit after `n` measured frames,
@@ -457,9 +486,10 @@ field falls back to its default instead of aborting the parse.
   resolves inside the flex row NEWS/RELEASES put it in. Dropped straight into
   the content panel's column it overflows and pushes the playbar off the
   window — `settings_content` wraps it in a `cols` box for that reason alone.
-- **Updater reuse is partial**: `updaterdownload` + `updatersha256` +
-  `updaterzip` only. **Not** `updater.cpp`/`updaterstage2.cpp` — the launcher
-  is plain extract-and-replace (the game isn't running). On macOS `updaterzip`
+- **Updater reuse**: `updaterdownload` + `updatersha256` + `updaterzip` for
+  installing the game (plain extract-and-replace — the game isn't running),
+  plus `updaterstage2` for the launcher's OWN self-update (see Distribution).
+  **Not** `updater.cpp` (the game's state machine). On macOS `updaterzip`
   shells out to `ditto`, so no minizip dependency.
 
 ## Verify

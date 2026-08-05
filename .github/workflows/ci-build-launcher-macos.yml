@@ -60,7 +60,9 @@ jobs:
 
       - name: Verify bundled dependencies
         if: steps.changes.outputs.relevant == 'true'
-        run: tests/e2e/check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher" ""
+        # The defaulted third argument also asserts the self-update helper at
+        # Contents/Helpers/updater-stage-2 exists and stays dependency-free.
+        run: tests/e2e/check-bundle-macos.sh "build-launcher/Silencer Launcher.app" "Silencer Launcher"
 
       - if: steps.changes.outputs.relevant != 'true'
         run: echo "No launcher/reused-source/asset changes; skipping launcher macOS build."

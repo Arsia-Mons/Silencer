@@ -309,6 +309,30 @@ if(APPLE)
     MACOSX_BUNDLE_BUNDLE_VERSION "${SILENCER_LAUNCHER_VERSION}"
     MACOSX_BUNDLE_COPYRIGHT "Copyright (c) Arsia Mons. All rights reserved.")
   set(LAUNCHER_RES_DIR "$<TARGET_BUNDLE_CONTENT_DIR:silencer-launcher>/Resources")
+
+  # The nested stage-2 helper, at the exact path the macOS Launch() hardcodes:
+  # Contents/Helpers/updater-stage-2. Mirrors the game's helper target — the
+  # same 4-line main() over the same UpdaterStage2::Run. Shipping it inside the
+  # notarized bundle is the point: synthesizing a temporary .app at runtime
+  # would be assessed by Gatekeeper as newly downloaded code.
+  add_executable(updater-stage-2
+    "${SIL}/tools/updater-stage-2/main.cpp"
+    "${SIL}/src/updater/updaterstage2.cpp"
+    "${SIL}/src/updater/updaterzip.cpp")
+  target_compile_features(updater-stage-2 PRIVATE cxx_std_20)
+  target_include_directories(updater-stage-2 PRIVATE "${SIL}/src/updater")
+  # A literal bundle path, not $<TARGET_BUNDLE_CONTENT_DIR:silencer-launcher>:
+  # that genex would make this target depend on the launcher, which already
+  # depends on this target — a cycle. Same shape as the game's helper copy.
+  set(LAUNCHER_HELPERS_DIR
+      "${CMAKE_CURRENT_BINARY_DIR}/Silencer Launcher.app/Contents/Helpers")
+  add_custom_command(TARGET updater-stage-2 POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${LAUNCHER_HELPERS_DIR}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:updater-stage-2>"
+            "${LAUNCHER_HELPERS_DIR}/updater-stage-2"
+    VERBATIM)
+  add_dependencies(silencer-launcher updater-stage-2)
 else()
   set(LAUNCHER_RES_DIR "$<TARGET_FILE_DIR:silencer-launcher>")
 endif()

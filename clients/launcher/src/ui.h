@@ -29,6 +29,7 @@ struct Intents {
   std::function<void()> play;
   std::function<void(const std::string &, const std::string &)> sign_in;
   std::function<void()> sign_out;
+  std::function<void()> self_update; // download + apply the launcher's own update
   std::function<void(const std::string &)> open_url;
 };
 
