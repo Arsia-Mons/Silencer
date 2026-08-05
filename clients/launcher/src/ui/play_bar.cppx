@@ -165,8 +165,8 @@ struct PrimaryActionProps {
   return <AppButton
     key={props.key}
     variant={ButtonVariant::Primary}
-    disabled={blocked}
     label={is_installed ? "PLAY" : "INSTALL"}
+    disabled={blocked}
     on_activate={on_activate}
   />
 }

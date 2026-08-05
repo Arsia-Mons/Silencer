@@ -113,8 +113,8 @@ struct SignInFormProps {
     />
     <AppButton
       key="ap-go"
-      disabled={busy || st->user_text.empty() || st->pass_text.empty()}
       label={busy ? "SIGNING IN..." : "SIGN IN / REGISTER"}
+      disabled={busy || st->user_text.empty() || st->pass_text.empty()}
       on_activate={[&in, st](const ::ui::ActivationEvent &) {
         if (in.sign_in)
           in.sign_in(st->user_text, st->pass_text);
