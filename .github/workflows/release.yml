@@ -46,14 +46,31 @@ jobs:
             channel=stable
             skip=false
           else
-            # Read the protocol number from the tree rather than the ref. A
-            # branch ref is not a version: the old `${GITHUB_REF_NAME#v}` here
-            # yielded the literal string "main", which the Windows VERSIONINFO
-            # quad cannot represent and CFBundleShortVersionString rejects.
-            protocol="$(sed -n 's/^set(SILENCER_VERSION "\([0-9]\{1,\}\)".*/\1/p' \
-                        clients/silencer/CMakeLists.txt | head -1)"
+            # The protocol number comes from the newest release TAG, not from
+            # the ref and not from the tree.
+            #
+            # Not the ref: a branch ref is not a version. The old
+            # `${GITHUB_REF_NAME#v}` here yielded the literal string "main",
+            # which the Windows VERSIONINFO quad cannot represent and
+            # CFBundleShortVersionString rejects.
+            #
+            # Not the tree either: the number checked into
+            # clients/silencer/CMakeLists.txt is NOT what production speaks.
+            # This job overrides the compiled-in value with the tag on a
+            # release, and deploy.yml ships the lobby at "${TAG#v}"
+            # (deploy.yml:181). The tree has said 00058 since v00058 while
+            # v00062 is live, so reading the file would build a nightly that
+            # the production lobby rejects on sight — the exact lockout this
+            # split exists to prevent, just from the other direction.
+            protocol="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+            protocol="${protocol#v}"
             if [[ -z "$protocol" ]]; then
-              echo "could not read SILENCER_VERSION from clients/silencer/CMakeLists.txt" >&2
+              # No release has ever been tagged; the tree is all there is.
+              protocol="$(sed -n 's/^set(SILENCER_VERSION "\([0-9]\{1,\}\)".*/\1/p' \
+                          clients/silencer/CMakeLists.txt | head -1)"
+            fi
+            if [[ ! "$protocol" =~ ^[0-9]+$ ]]; then
+              echo "could not resolve a numeric protocol version (got '$protocol')" >&2
               exit 1
             fi
             build_id="${protocol}+nightly.$(date -u +%Y%m%d).${GITHUB_SHA::7}"

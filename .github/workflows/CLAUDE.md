@@ -63,12 +63,20 @@ Every build job takes its versions from the single `version` job. It
 emits **two** strings, and conflating them is the trap it exists to
 prevent:
 
-- **`protocol`** — the wire protocol number (`00058`). The lobby
-  compares it against every connecting client
-  (`services/lobby/client.go:157`). A nightly **never** invents a new
-  one: the moment the lobby redeployed at it, every stable client would
-  be rejected. On a non-tag ref it is read out of
-  `clients/silencer/CMakeLists.txt`, not the ref.
+- **`protocol`** — the wire protocol number. The lobby compares it
+  against every connecting client (`services/lobby/client.go:157`). A
+  nightly **never** invents a new one: the moment the lobby redeployed
+  at it, every stable client would be rejected. On a non-tag ref it
+  comes from **the newest `v*` tag**.
+
+  > Not from `clients/silencer/CMakeLists.txt`. That number is not what
+  > production speaks — `release.yml` overrides the compiled-in value
+  > with the tag, and `deploy.yml` ships the lobby at `"${TAG#v}"`
+  > (`deploy.yml:181`). The tree has said `00058` since v00058 while
+  > `v00062` is live. Building a nightly off the file produces a client
+  > the production lobby rejects on sight, which is the same lockout
+  > this split exists to prevent, arriving from the other direction.
+  > The file is only a fallback for a repo with no release tags at all.
 - **`build_id`** — the build's own identity
   (`00058+nightly.20260805.a1b2c3d`), and the only thing self-update
   compares. On a tag the two are equal.
