@@ -1,8 +1,14 @@
 # web/website — public landing page (arsiamons.com)
 
 Single static page: logo, two-paragraph pitch (preserved Mind Control
-Software, 2000 blurb), three CTAs (Download / GitHub / Discord). No
-framework, no build step, no JS shipped to the browser.
+Software, 2000 blurb), four CTAs (Download / Launcher / GitHub /
+Discord). No framework, no build step, no JS shipped to the browser.
+
+The Launcher link is a **direct** `.dmg` download off the latest
+release, not the releases page — hence the `(mac)` in the label. It is
+the one macOS-only artifact here, and `release.yml`'s
+`build-launcher-macos` job is what publishes the file the URL points
+at. Rename the artifact there and this link 404s.
 
 ## Files
 

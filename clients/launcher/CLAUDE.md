@@ -79,6 +79,23 @@ The build output is `build/SilencerLauncher.app` (macOS — a real bundle, so
 the resources travel with the binary and codesigning has something to sign) /
 `build\silencer-launcher.exe` (Windows).
 
+The bundle's `Info.plist` comes from `SilencerLauncher-Info.plist`, and its
+icon is `shared/icons/icon.icns` — the game's icon, shared on purpose: one
+product, one mark in the Dock. The version is **not a literal anywhere**:
+`-DSILENCER_LAUNCHER_VERSION` fills `CFBundleShortVersionString` and
+`CFBundleVersion`, `release.yml` passes `${GITHUB_REF_NAME#v}`, and a local
+build gets `00000`.
+
+Two plist keys are Xcode-generator-only and come out **empty** under Ninja —
+`${EXECUTABLE_NAME}` and `${MACOSX_DEPLOYMENT_TARGET}`, which is why this
+template uses `${MACOSX_BUNDLE_EXECUTABLE_NAME}` and
+`${CMAKE_OSX_DEPLOYMENT_TARGET}` instead. (`clients/silencer/Silencer-Info.plist`
+still has the Xcode spellings and therefore ships an empty `CFBundleExecutable`;
+it only launches because Launch Services falls back to the bundle name, which
+happens to match. Don't copy that file's spellings.) Check with
+`plutil -p build/SilencerLauncher.app/Contents/Info.plist` — a wrong variable
+name is silently an empty string, never an error.
+
 The build **stages its own resources**: the five `shared/fonts/*.otf` faces and
 the 12 sprite banks `backgrounds.cpp` actually decodes (0–4, 7, 208 for
 backdrops and the logo; 132–136 for the glyph faces) are copied POST_BUILD into
@@ -108,8 +125,52 @@ entry that newer dyld hard-aborts on, re-signs, and **fails the script** if any
 `.github/actions/build-silencer-macos/action.yml`, which does the same for the
 game — keep the two in step.
 
-Still to do for a real release: a CI job, Developer ID signing, notarization,
-and a DMG. `release.yml` does all four for the game and is the template.
+## Distribution (macOS)
+
+`release.yml`'s **`build-launcher-macos`** job is the whole pipeline, and it
+runs on a `v*` tag next to the game's `build-macos`:
+
+`.github/actions/build-launcher-macos` (configure + build + `package-macos.sh`)
+→ import the Developer ID cert → codesign inside-out with
+`--options runtime --timestamp` → `notarytool submit --wait` → `stapler staple`
++ `validate` → `spctl -a -vv -t execute` → `create-dmg` with an
+`/Applications` symlink → sign, notarize and staple **the DMG itself** →
+upload `silencer-launcher-macos-arm64.dmg`.
+
+The CI action calls the same `package-macos.sh` a developer runs, so the two
+cannot drift. It reuses `release.yml`'s existing Apple secrets
+(`APPLE_CERT_P12_BASE64`, `APPLE_CERT_P12_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`) — no new secret. It builds into
+`build-launcher/`, not `build/`, so it never collides with the game job.
+
+`web/website/index.html` links straight at
+`releases/latest/download/silencer-launcher-macos-arm64.dmg`. **Renaming the
+artifact 404s that link.**
+
+### arm64 only, deliberately
+
+The launcher is **not** a universal binary, and making it one would be worse
+than not. `CMAKE_OSX_ARCHITECTURES=arm64;x86_64` is technically reachable in
+CI — libcurl comes from `/usr/lib` (already universal), Yoga is a FetchContent
+source build that follows the setting, and `setup-sdl` builds SDL3/SDL3_ttf
+from source so it could build both slices. (Homebrew is arm64-only, so none of
+it is buildable or testable on a dev Mac.)
+
+The blocker is the payload, not the build: **the game ships arm64-only**
+(`silencer-macos-arm64.dmg` is the only macOS artifact `release.yml`
+produces). Rosetta translates x86_64 → arm64, not the reverse, so an Intel Mac
+cannot run the game at all. A universal launcher would install fine there,
+then fail at PLAY — a worse experience than not offering the download. Ship
+universal only when the game does.
+
+### Self-update
+
+The launcher does not update itself yet. The mechanism decision (Sparkle vs.
+adapting `clients/silencer/src/updater/`) is written up in
+[`../../docs/plans/2026-08-04-launcher-self-update.md`](../../docs/plans/2026-08-04-launcher-self-update.md)
+— recommendation: adapt the existing updater, plus a Developer ID requirement
+check on the staged bundle to recover the payload-signing property Sparkle
+would have given. Nothing is built.
 
 ## Run
 

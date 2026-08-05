@@ -9,6 +9,17 @@ set(SIL "${CMAKE_CURRENT_SOURCE_DIR}/../silencer")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# The release tag drives the version, never a literal in a file. release.yml
+# passes -DSILENCER_LAUNCHER_VERSION=${GITHUB_REF_NAME#v}; the default marks a
+# local build the same way the client's SILENCER_VERSION default does.
+set(SILENCER_LAUNCHER_VERSION "00000" CACHE STRING "Launcher version (from the git tag)")
+
+# Info.plist reads this for LSMinimumSystemVersion, so it must have a value even
+# in a plain local build. 11.0 matches the client's release configure.
+if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
+endif()
+
 # --- Dependencies (mirror clients/silencer: Homebrew SDL3, system libcurl) ----
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 find_package(SDL3 REQUIRED)
@@ -182,12 +193,26 @@ set(LAUNCHER_SPR_BANKS 000 001 002 003 004 007 132 133 134 135 136 208)
 
 if(APPLE)
   # A bundle, not a bare executable: it keeps the resources with the binary as
-  # one movable unit, and it is what codesigning and a DMG will need later.
+  # one movable unit, and it is what codesigning and the DMG need.
+  #
+  # The launcher shares the game's icon (shared/icons/icon.icns) on purpose —
+  # it is the same product, and the Dock reads better with one mark than with
+  # two near-identical ones. CMake copies it in through the source property.
+  set(LAUNCHER_ICNS "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/icons/icon.icns")
+  set_source_files_properties("${LAUNCHER_ICNS}" PROPERTIES
+    MACOSX_PACKAGE_LOCATION "Resources")
+  target_sources(silencer-launcher PRIVATE "${LAUNCHER_ICNS}")
+
   set_target_properties(silencer-launcher PROPERTIES
     MACOSX_BUNDLE TRUE
     OUTPUT_NAME "SilencerLauncher"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/SilencerLauncher-Info.plist"
     MACOSX_BUNDLE_BUNDLE_NAME "Silencer Launcher"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.arsiamons.silencer.launcher")
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.arsiamons.silencer.launcher"
+    MACOSX_BUNDLE_ICON_FILE "icon.icns"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${SILENCER_LAUNCHER_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${SILENCER_LAUNCHER_VERSION}"
+    MACOSX_BUNDLE_COPYRIGHT "Copyright (c) Arsia Mons. All rights reserved.")
   set(LAUNCHER_RES_DIR "$<TARGET_BUNDLE_CONTENT_DIR:silencer-launcher>/Resources")
 else()
   set(LAUNCHER_RES_DIR "$<TARGET_FILE_DIR:silencer-launcher>")

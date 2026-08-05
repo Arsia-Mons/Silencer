@@ -171,6 +171,135 @@ jobs:
           path: build/silencer-macos-arm64.dmg
           if-no-files-found: error
 
+  build-launcher-macos:
+    # Same macos-15 pin as build-macos, for the same reason (the newer dyld's
+    # duplicate-LC_RPATH abort). The launcher does not run the auto-updater
+    # e2e — it has no self-updater yet (see docs/plans/2026-08-04-launcher-
+    # self-update.md), so this job is build -> bundle -> sign -> notarize ->
+    # DMG and nothing else.
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute version from tag
+        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Install create-dmg
+        # Release-only; the composite installs dylibbundler.
+        run: brew install create-dmg
+
+      - name: Build launcher
+        uses: ./.github/actions/build-launcher-macos
+        with:
+          launcher-version: ${{ env.SILENCER_VERSION }}
+          build-dir: build-launcher
+
+      - name: Import Developer ID cert
+        env:
+          CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          CERT_P12_PASSWORD: ${{ secrets.APPLE_CERT_P12_PASSWORD }}
+        run: |
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+          echo "$CERT_P12_BASE64" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import /tmp/cert.p12 -P "$CERT_P12_PASSWORD" \
+            -A -t cert -f pkcs12 -k build.keychain
+          security list-keychains -d user -s build.keychain \
+            $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm /tmp/cert.p12
+          security find-identity -v -p codesigning build.keychain
+
+      - name: Codesign with Developer ID
+        working-directory: build-launcher
+        run: |
+          IDENTITY="Developer ID Application"
+          # Sign inside-out: dylibs first, then the main binary, then the
+          # bundle. This MUST come after package-macos.sh's last
+          # install_name_tool edit — an rpath edit invalidates a Mach-O
+          # signature and Apple Silicon then SIGKILLs the binary with exit 137
+          # and no output at all. --force overrides the ad-hoc signature the
+          # script applied. --options runtime (Hardened Runtime) + --timestamp
+          # are both required by notarytool.
+          find SilencerLauncher.app/Contents/Frameworks -name "*.dylib" -print0 \
+            | xargs -0 -n1 codesign --force --timestamp --options runtime \
+              --sign "$IDENTITY"
+          codesign --force --timestamp --options runtime \
+            --sign "$IDENTITY" SilencerLauncher.app/Contents/MacOS/SilencerLauncher
+          codesign --force --timestamp --options runtime \
+            --sign "$IDENTITY" SilencerLauncher.app
+          codesign --verify --deep --strict --verbose=2 SilencerLauncher.app
+
+      - name: Notarize and staple
+        working-directory: build-launcher
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -ck --keepParent SilencerLauncher.app /tmp/notarize-launcher.zip
+          xcrun notarytool submit /tmp/notarize-launcher.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          rm /tmp/notarize-launcher.zip
+          xcrun stapler staple SilencerLauncher.app
+          xcrun stapler validate SilencerLauncher.app
+          spctl -a -vv -t execute SilencerLauncher.app
+
+      - name: Build, sign, notarize, staple DMG
+        working-directory: build-launcher
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # --app-drop-link is the /Applications symlink, so the Finder window
+        # shows the drag-to-install affordance. The .app inside is already
+        # stapled, so the DMG and its payload each carry their own notarization
+        # ticket and both launch offline.
+        run: |
+          create-dmg \
+            --volname "Silencer Launcher" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "SilencerLauncher.app" 175 200 \
+            --hide-extension "SilencerLauncher.app" \
+            --app-drop-link 425 200 \
+            silencer-launcher-macos-arm64.dmg \
+            SilencerLauncher.app
+          codesign --force --timestamp \
+            --sign "Developer ID Application" \
+            silencer-launcher-macos-arm64.dmg
+          xcrun notarytool submit silencer-launcher-macos-arm64.dmg \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple silencer-launcher-macos-arm64.dmg
+          xcrun stapler validate silencer-launcher-macos-arm64.dmg
+          spctl -a -vv -t open --context context:primary-signature \
+            silencer-launcher-macos-arm64.dmg
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain build.keychain || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-macos-arm64-dmg
+          path: build-launcher/silencer-launcher-macos-arm64.dmg
+          if-no-files-found: error
+
   build-windows:
     runs-on: windows-latest
     timeout-minutes: 60
@@ -260,7 +389,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [build-macos, build-windows, build-linux]
+    needs: [build-macos, build-launcher-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -292,6 +421,7 @@ jobs:
           files: |
             artifacts/macos-arm64/*
             artifacts/macos-arm64-dmg/*
+            artifacts/launcher-macos-arm64-dmg/*
             artifacts/windows-x64/*
             artifacts/windows-x64-setup/*
             artifacts/linux-x64/*
@@ -299,6 +429,7 @@ jobs:
             ## Downloads
 
             - **macOS (Apple Silicon) — DMG (recommended):** `silencer-macos-arm64.dmg` (drag to Applications)
+            - **macOS (Apple Silicon) — launcher DMG:** `silencer-launcher-macos-arm64.dmg` (drag to Applications; installs the game for you)
             - **macOS (Apple Silicon) — portable zip:** `silencer-macos-arm64.zip`
             - **Windows (x64) — installer (recommended):** `silencer-windows-x64-setup-*.exe`
             - **Windows (x64) — portable zip:** `silencer-windows-x64.zip`

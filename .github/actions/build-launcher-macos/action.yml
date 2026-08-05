@@ -1,0 +1,75 @@
+name: Build Silencer Launcher (macOS)
+description: Configure + build + bundle dylibs for the Silencer launcher on macOS arm64. Caller must have run actions/checkout first; codesign / notarize / DMG live in the caller (release-only).
+
+inputs:
+  launcher-version:
+    description: Version stamped into CFBundleShortVersionString / CFBundleVersion. release.yml passes the git tag with its leading v stripped.
+    default: "00000"
+  build-dir:
+    description: Where to configure the build. Kept out of the game's build/ so both jobs can run from one checkout.
+    default: build-launcher
+
+runs:
+  using: composite
+  steps:
+    - name: Install Homebrew deps
+      shell: bash
+      # No minizip: updaterzip.cpp shells out to ditto on macOS, so the
+      # launcher never links it (see clients/launcher/CMakeLists.txt).
+      run: brew install dylibbundler
+
+    - name: Install SDL3 + SDL3_ttf
+      uses: libsdl-org/setup-sdl@main
+      with:
+        version: 3-latest
+        version-sdl-ttf: 3-latest
+        # Same as the client: vendored freetype/harfbuzz keeps libSDL3_ttf
+        # self-contained, so there is no system freetype to bundle alongside.
+        cmake-arguments: -DSDLTTF_VENDORED=ON
+
+    - name: Setup sccache
+      uses: mozilla-actions/sccache-action@v0.0.10
+
+    - name: Configure
+      shell: bash
+      env:
+        LAUNCHER_VERSION_INPUT: ${{ inputs.launcher-version }}
+        BUILD_DIR: ${{ inputs.build-dir }}
+      run: |
+        cmake -B "$BUILD_DIR" -S clients/launcher \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+          -DSILENCER_LAUNCHER_VERSION="$LAUNCHER_VERSION_INPUT"
+
+    - name: Build
+      shell: bash
+      env:
+        BUILD_DIR: ${{ inputs.build-dir }}
+      run: cmake --build "$BUILD_DIR" -j"$(sysctl -n hw.ncpu)"
+
+    - name: sccache stats
+      if: always()
+      shell: bash
+      run: sccache --show-stats
+
+    - name: Bundle dylibs
+      shell: bash
+      env:
+        BUILD_DIR: ${{ inputs.build-dir }}
+      # package-macos.sh owns the whole dylib story (copy into
+      # Contents/Frameworks, rewrite to @rpath, dedupe LC_RPATH, re-sign last)
+      # and fails if any /opt/homebrew path survives. It is the same script
+      # developers run locally, so CI and a desk build cannot drift.
+      # setup-sdl exports SDL3_ROOT / SDL3_ttf_ROOT, which the script reads as
+      # dylibbundler search paths.
+      run: bash clients/launcher/package-macos.sh "$BUILD_DIR/SilencerLauncher.app"
+
+    - name: Show bundle
+      shell: bash
+      env:
+        BUILD_DIR: ${{ inputs.build-dir }}
+      run: |
+        plutil -p "$BUILD_DIR/SilencerLauncher.app/Contents/Info.plist"
+        ls -R "$BUILD_DIR/SilencerLauncher.app/Contents/Resources" | head -40

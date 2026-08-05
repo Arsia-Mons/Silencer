@@ -4,6 +4,7 @@ build-old/
 build-release/
 build-unity/
 build-headless/
+build-launcher/
 e2e-build-old/
 e2e-build-new/
 e2e-build-tests/

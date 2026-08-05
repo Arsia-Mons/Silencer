@@ -42,7 +42,8 @@ these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 |---|---|
 | `release.yml` | push of `v*` tag, or manual dispatch |
 
-`release.yml` jobs: `build-macos` + `build-windows` + `build-linux`
+`release.yml` jobs: `build-macos` + `build-launcher-macos` +
+`build-windows` + `build-linux`
 (parallel) → `release` (creates the GitHub Release) → `publish-npm`
 (stages and publishes the five npm packages described in
 `clients/tui/CLAUDE.md`).
@@ -55,6 +56,16 @@ the new version relaunches — gating the release on a working self-updater
 (issue #303). It runs on a scratch copy so the shipped artifact is untouched,
 and needs `oven-sh/setup-bun` (the harness drives the game via `clients/cli`).
 `build-linux` has no such step (Linux isn't a shipped self-update platform).
+
+`build-launcher-macos` builds `clients/launcher/` into `build-launcher/`
+(never `build/` — both macOS jobs run from their own checkout, but the
+separate dir keeps the two artifact trees obviously distinct), then runs
+the same sign → notarize → staple → `create-dmg` → sign/notarize/staple
+the DMG sequence as `build-macos`, on the same Apple secrets. It has no
+auto-updater e2e because the launcher has no self-updater yet
+(`docs/plans/2026-08-04-launcher-self-update.md`). Its DMG name,
+`silencer-launcher-macos-arm64.dmg`, is linked directly from
+`web/website/index.html` — renaming it breaks that link.
 
 `publish-npm` requires the `NPM_TOKEN` secret (granular publish
 token for the `arsia-mons` scope + the unscoped `silencer-tui`
