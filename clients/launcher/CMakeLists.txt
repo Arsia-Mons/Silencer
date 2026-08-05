@@ -171,12 +171,22 @@ set(SIL_APP_SHELL
   src/client/ui/app_shell/navigation/screen_stack.cpp
   src/client/ui/providers/navigation_provider.cpp)
 
-# Updater primitives (download + sha256 + zip extract). NOT updater.cpp /
-# updaterstage2.cpp — the launcher is plain extract-and-replace.
+# Updater primitives (download + sha256 + zip extract), plus stage-2 for the
+# launcher's OWN self-update. NOT updater.cpp — installing the game is plain
+# extract-and-replace, because the game is not running.
+#
+# updaterstage2.cpp is reused verbatim, not forked. Every path it acts on
+# arrives through argv (--zip / --install-dir / --pid / --relaunch) and
+# ResolveInstallDir just strips `/Contents/MacOS`, so nothing in it is specific
+# to the game's bundle. It only needs a helper at the same relative path inside
+# our bundle. (docs/plans/2026-08-04-launcher-self-update.md predicted an
+# adapted copy would be needed; reading it says otherwise, and a copy would be
+# 658 lines of the most brick-prone code in the tree, forked.)
 set(SIL_UPDATER
   src/updater/updaterdownload.cpp
   src/updater/updatersha256.cpp
-  src/updater/updaterzip.cpp)
+  src/updater/updaterzip.cpp
+  src/updater/updaterstage2.cpp)
 
 set(SIL_SOURCES "")
 foreach(s ${SIL_UI_RUNTIME} ${SIL_UI_BRIDGE} ${SIL_APP_SHELL} ${SIL_UPDATER})

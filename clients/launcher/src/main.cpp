@@ -3,6 +3,7 @@
 #include "ui.h"
 
 #include "client/ui/app_shell/ui_pipeline.h"
+#include "updater/updaterstage2.h"
 #include "render/cppx_ui/pipeline_host.h"
 #include "render/cppx_ui/sdl_ui_input.h"
 #include "ui/input.h"
@@ -256,7 +257,21 @@ void handle_key(SDL_Keycode key, ::ui::UiInputFrame &in, bool typing) {
 
 } // namespace
 
-int main(int, char **) {
+int main(int argc, char **argv) {
+  // Stage-2 self-replace. This same binary is re-executed by the nested helper
+  // in Contents/Helpers to swap the bundle out from under the launcher that
+  // spawned it, so the check must come before SDL touches anything — stage-2
+  // opens no window and must not init a video driver it will never use.
+  for (int i = 1; i < argc; ++i) {
+    if (std::string(argv[i]) == "--self-update-stage2")
+      return UpdaterStage2::Run(argc, argv);
+  }
+
+  // Clear leftovers from a previous self-update (`<install>.old`, and on
+  // Windows the sidelined `<file>.old-<ticks>` copies stage-2 leaves when a
+  // target was locked). Safe when no update ever ran.
+  UpdaterStage2::CleanupPreviousUpdate();
+
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
     return 1;
