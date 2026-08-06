@@ -34,6 +34,7 @@ public:
 	void RequestCapture() override;
 	bool TakeCapturedFrame(std::vector<Uint8> &rgba, int &w, int &h) override;
 	void Present() override;
+	const char *GpuDriverName() const override;
 	void SetScaleFilter(bool linear) override;
 	void BeginLobbyPanelBorderBlur(int virtualWidth, int virtualHeight, float uiScale) override;
 	void AddLobbyPanelBorderBlurRect(const SDL_Rect & rect) override;

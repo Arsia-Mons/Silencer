@@ -5,6 +5,7 @@
 #include "gasloader.h"
 #include "lobbygame.h"
 #include "objecttypes.h"
+#include "perf_otlp.h"
 #include "perf_trace.h"
 #include "player.h"
 #include "state.h"
@@ -169,6 +170,29 @@ bool Game::Loop(void){
 
 	// Goodbye, Mr. Anderson.
 	if(quitRequested) return false;
+
+	// Open the per-frame trace root: every PERF_SCOPE below (game.tick, sim,
+	// world.draw, ui, present) nests under it. Tail-sampled — only over-budget
+	// frames (plus a 1-in-N baseline) are emitted. Dedicated servers don't
+	// render, so they never open a frame trace.
+	perf::Operation _frame("frame", perf::Sampling::FrameBudget, !world.dedicatedserver.active);
+
+	// Reflect mid-session identity/display changes into the OTLP Resource
+	// (account becomes known after lobby auth; viewport/fullscreen on resize).
+	// Each setter bumps session.epoch only on an actual change.
+	if(perf::g_trace_enabled && !world.dedicatedserver.active){
+		if(world.lobby.accountid != 0) perf::otlp::SetAccountId(world.lobby.accountid);
+		if(SDL_Window * win = gameRenderer.GetWindow()){
+			int vw = 0, vh = 0;
+			if(!SDL_GetWindowSizeInPixels(win, &vw, &vh) || vw < 1)
+				SDL_GetWindowSize(win, &vw, &vh);
+			bool fs = (SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN) != 0;
+			const char * gpuUiEnv = SDL_getenv("SILENCER_GPU_UI");
+			RenderDevice * dev = gameRenderer.GetRenderDevice();
+			bool gpuUi = dev && dev->SupportsUiGeometry() && (!gpuUiEnv || strcmp(gpuUiEnv, "0") != 0);
+			perf::otlp::SetDisplay(vw, vh, fs, true, gpuUi ? "gpu" : "cpu");
+		}
+	}
 
 	// Process commands from CLI
 	DrainControlQueue();
