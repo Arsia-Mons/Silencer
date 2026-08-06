@@ -2720,9 +2720,9 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	if(health == 0 && state != DYING && state != DEAD){
 		Peer * peer = GetPeer(world);
 		Object * owner = world.GetObjectFromId(projectile.ownerid);
+		bool killedself = false;
 		if(peer){
 			const char * killedby = "?";
-			bool killedself = false;
 			if(owner){
 				switch(owner->type){
 					case ObjectTypes::WALLDEFENSE:{
@@ -2802,6 +2802,27 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 
 		if (world.IsAuthority()) {
+			if(world.dedicatedserver.active && peer && !killedself){
+				Uint8 weaponIdx = 0;
+				switch(projectile.type){
+					case ObjectTypes::LASERPROJECTILE:   weaponIdx = 1; break;
+					case ObjectTypes::ROCKETPROJECTILE:  weaponIdx = 2; break;
+					case ObjectTypes::FLAMERPROJECTILE:  weaponIdx = 3; break;
+					default:                             weaponIdx = 0; break;
+				}
+				Uint32 killerAcct = 0;
+				Uint8 killerAgency = 0;
+				if(owner && owner->type == ObjectTypes::PLAYER){
+					Player * killer = static_cast<Player *>(owner);
+					Peer * kpeer = killer->GetPeer(world);
+					if(kpeer){
+						killerAcct = kpeer->accountid;
+						Team * kt = world.GetPeerTeam(kpeer->id);
+						if(kt) killerAgency = (Uint8)kt->agency;
+					}
+				}
+				world.dedicatedserver.SendKillEvent(killerAcct, peer->accountid, weaponIdx, killerAgency, (Sint32)this->x, (Sint32)this->y);
+			}
 			if(world.gameMode){
 				world.gameMode->OnPlayerDied(world, *this, owner);
 			}
