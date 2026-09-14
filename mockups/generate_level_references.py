@@ -6,7 +6,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from sil_reference import ASSETS, read_map, render_tiles
+from sil_reference import ASSETS, read_map, render_map
+from actor_reference import annotate_actors
 
 OUTPUT = Path(__file__).resolve().parent / "levels"
 HEADER = 150
@@ -28,33 +29,14 @@ def render_reference(manifest, tiles):
     draw.text((MARGIN, 24), f"SILENCER / {source_name}", font=title, fill="#e4f3ff")
     draw.text((MARGIN, 76), manifest["description"], font=body, fill="#c5dbea")
     draw.text((MARGIN, 112),
-              f"ORIGINAL TILES + ACTOR ANCHORS  /  {width} x {height}px  /  "
+              f"GAME OBJECTS + SPAWN POINTS  /  {width} x {height}px  /  "
               f"{len(actors)} ACTORS  /  LIGHTING OFF, NOT A GAME SCREENSHOT",
               font=small, fill="#88adc1")
 
-    placed = []
-    marker_positions = []
     for actor in actors:
-        x, y = actor["x"] + MARGIN, actor["y"] + HEADER
-        if not (MARGIN <= x < MARGIN + width and HEADER <= y < HEADER + height):
+        if not (0 <= actor["x"] < width and 0 <= actor["y"] < height):
             raise ValueError(f"{source_name}: actor {actor['index']} lies outside the map")
-        candidates = [(0, -32), (45, -32), (-45, -32), (0, 38), (45, 38),
-                      (-45, 38), (85, -32), (-85, -32), (0, -80), (0, 85)]
-        for dx, dy in candidates:
-            mx, my = x + dx, y + dy
-            if not (22 <= mx < board.width - 22 and HEADER + 22 <= my < HEADER + height - 22):
-                continue
-            if all(abs(mx - px) >= 44 or abs(my - py) >= 44 for px, py in placed):
-                break
-        else:
-            raise ValueError(f"{source_name}: cannot place a readable label for actor {actor['index']}")
-        placed.append((mx, my))
-        marker_positions.append({"index": actor["index"], "label_center_px": [mx, my]})
-        draw.line((x, y, mx, my), fill="#ffcf6c", width=2)
-        draw.ellipse((x - 3, y - 3, x + 3, y + 3), fill="#ffcf6c")
-        draw.ellipse((mx - 20, my - 20, mx + 20, my + 20),
-                     fill="#101820", outline="#ffcf6c", width=2)
-        draw.text((mx, my), str(actor["index"]), anchor="mm", font=small, fill="#fff0cf")
+    marker_positions = annotate_actors(board, manifest, (MARGIN, HEADER))
 
     top = HEADER + height + 24
     draw.text((MARGIN, top), "ACTOR INDEX / labels point to the encoded actor positions; numbers are zero-based.",
@@ -73,7 +55,7 @@ def render_reference(manifest, tiles):
         "map_origin_px": [MARGIN, HEADER],
         "scale": 1,
         "markers": marker_positions,
-        "note": "Lighting off: luminance-marked tiles, actor sprites, parallax and runtime lighting omitted.",
+        "note": "Lighting off. Static game-object sprites plus explicit spawn and source-only markers; no parallax or runtime lighting.",
     }
     return board
 
@@ -84,8 +66,8 @@ def main():
         raise FileNotFoundError("No top-level .SIL files found in shared/assets/level")
     for source in sources:
         manifest, raw = read_map(source)
-        tiles = render_tiles(manifest, raw)
-        reference = render_reference(manifest, tiles)
+        tiles = render_map(manifest, raw)
+        reference = render_reference(manifest, render_map(manifest, raw, include_actors=True))
         destination = OUTPUT / source.stem
         destination.mkdir(parents=True, exist_ok=True)
         tiles.convert("RGB").save(destination / "source-tiles.png")

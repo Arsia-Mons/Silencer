@@ -6,8 +6,12 @@ modify the source `.SIL` or runtime assets when generating a mockup.
 The interdimensional-base study uses Python for Blender automation and
 Pillow for its source-reference image, not the game's build pipeline.
 See `interdimensional-base/README.md` for the regeneration commands.
-`sil_reference.py` shares the source decoder and tile compositor between the
-base and level references. Run `python3 mockups/generate_level_references.py`
+`sil_reference.py` shares the source decoder and map compositor between the
+base and level references. `actor_reference.py` decodes original sprite banks,
+composites representative object frames before foreground tiles, and annotates
+source-only markers. `source-tiles.png` stays tile-only; `source-reference.png`
+includes object sprites and explicit cyan player-spawn labels.
+Run `python3 mockups/generate_level_references.py`
 from the repo root to regenerate `levels/`; its non-recursive `*.SIL` glob
 intentionally excludes `shared/assets/level/community/`.
 Source images omit every tile with a nonzero per-cell luminance byte:

@@ -104,17 +104,29 @@ def read_map(source):
     return manifest, raw
 
 
+def decode_pixels(data, offset, pixel_count):
+    pixels = bytearray()
+    while len(pixels) < pixel_count:
+        word = struct.unpack_from("<I", data, offset)[0]
+        offset += 4
+        if word >= 0xFF000000:
+            count = word & 65535
+            if count == 0 or count % 4:
+                raise ValueError("Invalid pixel RLE run")
+            pixels.extend(bytes([(word >> 16) & 255]) * count)
+        else:
+            pixels.extend(struct.pack("<I", word))
+    if len(pixels) != pixel_count:
+        raise ValueError("Pixel RLE run exceeds image bounds")
+    return bytes(pixels), offset
+
+
 def tile_images(bank, palette, count):
     from PIL import Image
 
     data = (ASSETS / "bin_til" / f"TIL_{bank:03d}.BIN").read_bytes()
-    pixels = bytearray()
-    for (word,) in struct.iter_unpack("<I", data[12 * count + 4:]):
-        if word >= 0xFF000000:
-            pixels.extend(bytes([(word >> 16) & 255]) * (word & 65535))
-        else:
-            pixels.extend(struct.pack("<I", word))
-    if len(pixels) != count * 4096:
+    pixels, end = decode_pixels(data, 12 * count + 4, count * 4096)
+    if end != len(data):
         raise ValueError(f"Invalid decoded size for tile bank {bank}")
     images = []
     for i in range(count):
@@ -126,7 +138,7 @@ def tile_images(bank, palette, count):
     return images
 
 
-def render_tiles(manifest, raw):
+def render_map(manifest, raw, *, include_actors=False):
     from PIL import Image
 
     width, height = manifest["width_tiles"], manifest["height_tiles"]
@@ -138,6 +150,9 @@ def render_tiles(manifest, raw):
     # The engine sends nonzero-LUM tiles to DrawLight, not DrawTile. Exclude
     # those masks rather than painting their grayscale pixels over the artwork.
     for layer_offset in (0, 4, 8, 12, 20, 24, 28, 32):
+        if layer_offset == 20 and include_actors:
+            from actor_reference import draw_actor_sprites
+            draw_actor_sprites(reference, manifest, palette)
         for i in range(width * height):
             tile, flip, lum = struct.unpack_from("<HBB", raw, i * 36 + layer_offset)
             if not tile:
