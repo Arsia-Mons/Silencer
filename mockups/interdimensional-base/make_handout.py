@@ -20,7 +20,7 @@ hero = hero.resize((2280, 1244), Image.Resampling.LANCZOS)
 board.paste(hero, (60, 158))
 
 draw.text((65, 1440), "ORIGINAL 2D TILE REFERENCE", font=heading, fill="#e8f4ff")
-draw.text((65, 1482), "Unlit tiles; see source-reference.png for numbered equipment anchors.",
+draw.text((65, 1482), "Lighting off; see source-reference.png for numbered equipment anchors.",
           font=small, fill="#82b7ce")
 reference = Image.open(HERE / "source-tiles.png").crop((384, 256, 2624, 1152))
 reference = reference.resize((1390, 556), Image.Resampling.LANCZOS)

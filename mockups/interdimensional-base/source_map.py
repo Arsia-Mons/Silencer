@@ -25,7 +25,7 @@ def render_reference(manifest, raw):
     body = ImageFont.load_default(size=21)
     small = ImageFont.load_default(size=17)
     draw.text((40, 25), "SILENCER / INTERDIMENSIONAL BASE", font=title, fill="#e4f3ff")
-    draw.text((40, 75), "XBASE15A.SIL  /  ORIGINAL TILES + ACTOR ANCHORS  /  NOT A GAME SCREENSHOT",
+    draw.text((40, 75), "XBASE15A.SIL  /  ORIGINAL TILES + ACTOR ANCHORS  /  LIGHTING OFF",
               font=body, fill="#88adc1")
     for actor in manifest["actors"]:
         x, y = actor["x"] - 384, actor["y"] - 256 + 120
@@ -54,7 +54,8 @@ if __name__ == "__main__":
             "y_m": "invented depth; front -2, rear +2",
         },
         scale_note="One 64px tile = one design metre; not an original physical scale.",
-        tile_reference_note="Unlit tile composite, without sprites or parallax. "
+        tile_reference_note="Lighting off: luminance-marked tiles, actor sprites, parallax "
+                            "and runtime lighting are omitted. "
                             "Tile 0x0701 refers to empty bank 7 and is not drawn, "
                             "matching the engine's missing-surface behavior.",
     )

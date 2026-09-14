@@ -445,7 +445,15 @@
     "y_m": "invented depth; front -2, rear +2"
   },
   "scale_note": "One 64px tile = one design metre; not an original physical scale.",
-  "tile_reference_note": "Unlit tile composite, without sprites or parallax. Tile 0x0701 refers to empty bank 7 and is not drawn, matching the engine's missing-surface behavior.",
+  "tile_reference_note": "Lighting off: luminance-marked tiles, actor sprites, parallax and runtime lighting are omitted. Tile 0x0701 refers to empty bank 7 and is not drawn, matching the engine's missing-surface behavior.",
+  "lighting": {
+    "enabled": false,
+    "omitted_tile_references": 156,
+    "omitted_by_layer": {
+      "fg2": 156
+    },
+    "rule": "Omit every tile with a nonzero luminance byte; preserve non-light tiles on all eight layers."
+  },
   "undrawn_tiles": [
     {
       "tile_id": "0x0701",
