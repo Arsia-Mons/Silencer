@@ -1,0 +1,13 @@
+{
+  "source_sha256": "d107bf1662f485c637127e123e300bb8d0c6c9fa8a5ec9762a52b967c85dc712",
+  "source_platform_objects": 17,
+  "source_actor_anchors": 20,
+  "scene_objects": 798,
+  "model": "interdimensional-base.glb",
+  "native_scene": "interdimensional-base.blend",
+  "renders": [
+    "01-cutaway.png",
+    "02-front-elevation.png",
+    "03-operations-detail.png"
+  ]
+}
