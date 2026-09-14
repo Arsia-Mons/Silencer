@@ -764,6 +764,484 @@
     "rule": "Omit every tile with a nonzero luminance byte; preserve non-light tiles on all eight layers."
   },
   "undrawn_tiles": [],
+  "actor_sprites": {
+    "state": "Representative idle object frames; powerups shown available; neutral palette 0.",
+    "compositing": "After background tiles and before foreground tiles, at original signed sprite anchors.",
+    "limitations": "No animation, live surveillance feeds, runtime shadows or team/weapon palette effects.",
+    "rendered_actors": 22,
+    "entries": [
+      {
+        "index": 0,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 1605,
+            "y": 253,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1605,
+          253,
+          1661,
+          325
+        ]
+      },
+      {
+        "index": 1,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 1797,
+            "y": 253,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1797,
+          253,
+          1853,
+          325
+        ]
+      },
+      {
+        "index": 2,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 1989,
+            "y": 253,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1989,
+          253,
+          2045,
+          325
+        ]
+      },
+      {
+        "index": 3,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 2181,
+            "y": 253,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2181,
+          253,
+          2237,
+          325
+        ]
+      },
+      {
+        "index": 4,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 2373,
+            "y": 253,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2373,
+          253,
+          2429,
+          325
+        ]
+      },
+      {
+        "index": 5,
+        "parts": [
+          {
+            "bank": 121,
+            "frame": 0,
+            "x": 2261,
+            "y": 258,
+            "width": 28,
+            "height": 71,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2261,
+          258,
+          2289,
+          329
+        ]
+      },
+      {
+        "index": 6,
+        "parts": [
+          {
+            "bank": 121,
+            "frame": 0,
+            "x": 2581,
+            "y": 258,
+            "width": 28,
+            "height": 71,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2581,
+          258,
+          2609,
+          329
+        ]
+      },
+      {
+        "index": 7,
+        "parts": [],
+        "marker": "SPAWN"
+      },
+      {
+        "index": 8,
+        "parts": [],
+        "marker": "SPAWN"
+      },
+      {
+        "index": 9,
+        "parts": [],
+        "marker": "SPAWN"
+      },
+      {
+        "index": 10,
+        "parts": [],
+        "marker": "SPAWN"
+      },
+      {
+        "index": 11,
+        "parts": [],
+        "marker": "SPAWN"
+      },
+      {
+        "index": 12,
+        "parts": [],
+        "marker": "SPAWN"
+      },
+      {
+        "index": 13,
+        "parts": [
+          {
+            "bank": 184,
+            "frame": 0,
+            "x": 1061,
+            "y": 235,
+            "width": 120,
+            "height": 90,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1061,
+          235,
+          1181,
+          325
+        ]
+      },
+      {
+        "index": 14,
+        "parts": [
+          {
+            "bank": 184,
+            "frame": 0,
+            "x": 1445,
+            "y": 1515,
+            "width": 120,
+            "height": 90,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1445,
+          1515,
+          1565,
+          1605
+        ]
+      },
+      {
+        "index": 15,
+        "parts": [
+          {
+            "bank": 47,
+            "frame": 0,
+            "x": 575,
+            "y": 232,
+            "width": 72,
+            "height": 100,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          575,
+          232,
+          647,
+          332
+        ]
+      },
+      {
+        "index": 16,
+        "parts": [
+          {
+            "bank": 59,
+            "frame": 0,
+            "x": 908,
+            "y": 256,
+            "width": 28,
+            "height": 74,
+            "mirrored": true
+          }
+        ],
+        "bounds": [
+          908,
+          256,
+          936,
+          330
+        ]
+      },
+      {
+        "index": 17,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 1925,
+            "y": 1597,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1925,
+          1597,
+          1981,
+          1669
+        ]
+      },
+      {
+        "index": 18,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 1989,
+            "y": 1597,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1989,
+          1597,
+          2045,
+          1669
+        ]
+      },
+      {
+        "index": 19,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 2053,
+            "y": 1597,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2053,
+          1597,
+          2109,
+          1669
+        ]
+      },
+      {
+        "index": 20,
+        "parts": [
+          {
+            "bank": 183,
+            "frame": 0,
+            "x": 2117,
+            "y": 1597,
+            "width": 56,
+            "height": 72,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2117,
+          1597,
+          2173,
+          1669
+        ]
+      },
+      {
+        "index": 21,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 1160,
+            "y": 1224,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1160,
+          1224,
+          1212,
+          1275
+        ]
+      },
+      {
+        "index": 22,
+        "parts": [
+          {
+            "bank": 59,
+            "frame": 0,
+            "x": 2700,
+            "y": 768,
+            "width": 28,
+            "height": 74,
+            "mirrored": true
+          }
+        ],
+        "bounds": [
+          2700,
+          768,
+          2728,
+          842
+        ]
+      },
+      {
+        "index": 23,
+        "parts": [
+          {
+            "bank": 59,
+            "frame": 0,
+            "x": 2392,
+            "y": 768,
+            "width": 28,
+            "height": 74,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2392,
+          768,
+          2420,
+          842
+        ]
+      },
+      {
+        "index": 24,
+        "parts": [
+          {
+            "bank": 47,
+            "frame": 0,
+            "x": 2495,
+            "y": 744,
+            "width": 72,
+            "height": 100,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2495,
+          744,
+          2567,
+          844
+        ]
+      },
+      {
+        "index": 25,
+        "parts": [
+          {
+            "bank": 184,
+            "frame": 0,
+            "x": 1797,
+            "y": 875,
+            "width": 120,
+            "height": 90,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1797,
+          875,
+          1917,
+          965
+        ]
+      },
+      {
+        "index": 26,
+        "parts": [
+          {
+            "bank": 184,
+            "frame": 0,
+            "x": 1413,
+            "y": 875,
+            "width": 120,
+            "height": 90,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1413,
+          875,
+          1533,
+          965
+        ]
+      },
+      {
+        "index": 27,
+        "parts": [
+          {
+            "bank": 200,
+            "frame": 0,
+            "x": 2072,
+            "y": 1315,
+            "width": 20,
+            "height": 17,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2072,
+          1315,
+          2092,
+          1332
+        ]
+      }
+    ]
+  },
   "reference_image": {
     "map_origin_px": [
       40,
@@ -773,55 +1251,63 @@
     "markers": [
       {
         "index": 0,
+        "label": "0",
         "label_center_px": [
           1672,
-          444
+          379
         ]
       },
       {
         "index": 1,
+        "label": "1",
         "label_center_px": [
           1864,
-          444
+          379
         ]
       },
       {
         "index": 2,
+        "label": "2",
         "label_center_px": [
           2056,
-          444
+          379
         ]
       },
       {
         "index": 3,
+        "label": "3",
         "label_center_px": [
           2248,
-          444
+          379
         ]
       },
       {
         "index": 4,
+        "label": "4",
         "label_center_px": [
           2440,
-          444
+          379
         ]
       },
       {
         "index": 5,
+        "label": "5",
         "label_center_px": [
           2312,
-          444
+          384
         ]
       },
       {
         "index": 6,
+        "label": "6",
         "label_center_px": [
           2632,
-          444
+          384
         ]
       },
       {
         "index": 7,
+        "label": "SPAWN 7",
         "label_center_px": [
           1736,
           444
@@ -829,13 +1315,15 @@
       },
       {
         "index": 8,
+        "label": "SPAWN 8",
         "label_center_px": [
-          1800,
+          1910,
           444
         ]
       },
       {
         "index": 9,
+        "label": "SPAWN 9",
         "label_center_px": [
           2120,
           444
@@ -843,13 +1331,15 @@
       },
       {
         "index": 10,
+        "label": "SPAWN 10",
         "label_center_px": [
-          2184,
+          2306,
           444
         ]
       },
       {
         "index": 11,
+        "label": "SPAWN 11",
         "label_center_px": [
           2504,
           444
@@ -857,117 +1347,133 @@
       },
       {
         "index": 12,
+        "label": "SPAWN 12",
         "label_center_px": [
-          2568,
+          2690,
           444
         ]
       },
       {
         "index": 13,
+        "label": "13",
         "label_center_px": [
           1160,
-          444
+          361
         ]
       },
       {
         "index": 14,
+        "label": "14",
         "label_center_px": [
           1544,
-          1724
+          1641
         ]
       },
       {
         "index": 15,
+        "label": "15",
         "label_center_px": [
           648,
-          444
+          358
         ]
       },
       {
         "index": 16,
+        "label": "16",
         "label_center_px": [
           968,
-          444
+          382
         ]
       },
       {
         "index": 17,
+        "label": "17",
         "label_center_px": [
           1992,
-          1788
+          1723
         ]
       },
       {
         "index": 18,
+        "label": "18",
         "label_center_px": [
           2056,
-          1788
+          1723
         ]
       },
       {
         "index": 19,
+        "label": "19",
         "label_center_px": [
           2120,
-          1788
+          1723
         ]
       },
       {
         "index": 20,
+        "label": "20",
         "label_center_px": [
           2184,
-          1788
+          1723
         ]
       },
       {
         "index": 21,
+        "label": "21",
         "label_center_px": [
           1224,
-          1366
+          1350
         ]
       },
       {
         "index": 22,
+        "label": "22",
         "label_center_px": [
           2760,
-          956
+          894
         ]
       },
       {
         "index": 23,
+        "label": "23",
         "label_center_px": [
           2440,
-          956
+          894
         ]
       },
       {
         "index": 24,
+        "label": "24",
         "label_center_px": [
           2568,
-          956
+          870
         ]
       },
       {
         "index": 25,
+        "label": "25",
         "label_center_px": [
           1896,
-          1084
+          1001
         ]
       },
       {
         "index": 26,
+        "label": "26",
         "label_center_px": [
           1512,
-          1084
+          1001
         ]
       },
       {
         "index": 27,
+        "label": "POWERUP 27",
         "label_center_px": [
           2120,
-          1462
+          1441
         ]
       }
     ],
-    "note": "Lighting off: luminance-marked tiles, actor sprites, parallax and runtime lighting omitted."
+    "note": "Lighting off. Static game-object sprites plus explicit spawn and source-only markers; no parallax or runtime lighting."
   }
 }

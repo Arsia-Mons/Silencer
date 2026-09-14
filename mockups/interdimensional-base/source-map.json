@@ -445,7 +445,7 @@
     "y_m": "invented depth; front -2, rear +2"
   },
   "scale_note": "One 64px tile = one design metre; not an original physical scale.",
-  "tile_reference_note": "Lighting off: luminance-marked tiles, actor sprites, parallax and runtime lighting are omitted. Tile 0x0701 refers to empty bank 7 and is not drawn, matching the engine's missing-surface behavior.",
+  "tile_reference_note": "Tile-only image, lighting off: luminance-marked tiles, actor sprites, parallax and runtime lighting are omitted. Tile 0x0701 refers to empty bank 7 and is not drawn, matching the engine's missing-surface behavior.",
   "lighting": {
     "enabled": false,
     "omitted_tile_references": 156,
@@ -460,5 +460,649 @@
       "count": 958,
       "reason": "empty bank in BIN_TIL.DAT"
     }
-  ]
+  ],
+  "actor_sprites": {
+    "state": "Representative idle object frames; powerups shown available; neutral palette 0.",
+    "compositing": "After background tiles and before foreground tiles, at original signed sprite anchors.",
+    "limitations": "No animation, live surveillance feeds, runtime shadows or team/weapon palette effects.",
+    "rendered_actors": 19,
+    "entries": [
+      {
+        "index": 0,
+        "parts": [
+          {
+            "bank": 80,
+            "frame": 0,
+            "x": 840,
+            "y": 660,
+            "width": 108,
+            "height": 57,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          840,
+          660,
+          948,
+          717
+        ]
+      },
+      {
+        "index": 1,
+        "parts": [
+          {
+            "bank": 172,
+            "frame": 0,
+            "x": 846,
+            "y": 504,
+            "width": 100,
+            "height": 62,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          846,
+          504,
+          946,
+          566
+        ]
+      },
+      {
+        "index": 2,
+        "parts": [],
+        "marker": "EXIT"
+      },
+      {
+        "index": 3,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 503,
+            "y": 535,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          503,
+          535,
+          555,
+          586
+        ]
+      },
+      {
+        "index": 4,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 968,
+            "y": 520,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          968,
+          520,
+          1020,
+          571
+        ]
+      },
+      {
+        "index": 5,
+        "parts": [
+          {
+            "bank": 65,
+            "frame": 2,
+            "x": 572,
+            "y": 557,
+            "width": 112,
+            "height": 135,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          572,
+          557,
+          684,
+          692
+        ]
+      },
+      {
+        "index": 6,
+        "parts": [
+          {
+            "bank": 106,
+            "frame": 0,
+            "x": 1142,
+            "y": 896,
+            "width": 160,
+            "height": 141,
+            "mirrored": false
+          },
+          {
+            "bank": 106,
+            "frame": 1,
+            "x": 1171,
+            "y": 972,
+            "width": 104,
+            "height": 63,
+            "mirrored": false
+          },
+          {
+            "bank": 106,
+            "frame": 17,
+            "x": 1234,
+            "y": 905,
+            "width": 36,
+            "height": 53,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1142,
+          896,
+          1302,
+          1037
+        ]
+      },
+      {
+        "index": 7,
+        "parts": [
+          {
+            "bank": 106,
+            "frame": 0,
+            "x": 1398,
+            "y": 896,
+            "width": 160,
+            "height": 141,
+            "mirrored": false
+          },
+          {
+            "bank": 106,
+            "frame": 1,
+            "x": 1427,
+            "y": 972,
+            "width": 104,
+            "height": 63,
+            "mirrored": false
+          },
+          {
+            "bank": 106,
+            "frame": 21,
+            "x": 1490,
+            "y": 905,
+            "width": 36,
+            "height": 53,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1398,
+          896,
+          1558,
+          1037
+        ]
+      },
+      {
+        "index": 8,
+        "parts": [
+          {
+            "bank": 106,
+            "frame": 0,
+            "x": 1654,
+            "y": 896,
+            "width": 160,
+            "height": 141,
+            "mirrored": false
+          },
+          {
+            "bank": 106,
+            "frame": 1,
+            "x": 1683,
+            "y": 972,
+            "width": 104,
+            "height": 63,
+            "mirrored": false
+          },
+          {
+            "bank": 106,
+            "frame": 25,
+            "x": 1746,
+            "y": 905,
+            "width": 36,
+            "height": 53,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1654,
+          896,
+          1814,
+          1037
+        ]
+      },
+      {
+        "index": 9,
+        "parts": [
+          {
+            "bank": 152,
+            "frame": 0,
+            "x": 2302,
+            "y": 601,
+            "width": 132,
+            "height": 94,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2302,
+          601,
+          2434,
+          695
+        ]
+      },
+      {
+        "index": 10,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 1190,
+            "y": 427,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1190,
+          427,
+          1242,
+          478
+        ]
+      },
+      {
+        "index": 11,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 1192,
+            "y": 549,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1192,
+          549,
+          1244,
+          600
+        ]
+      },
+      {
+        "index": 12,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 1701,
+            "y": 556,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1701,
+          556,
+          1753,
+          607
+        ]
+      },
+      {
+        "index": 13,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 1704,
+            "y": 422,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1704,
+          422,
+          1756,
+          473
+        ]
+      },
+      {
+        "index": 14,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 2086,
+            "y": 797,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          2086,
+          797,
+          2138,
+          848
+        ]
+      },
+      {
+        "index": 15,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 1579,
+            "y": 802,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1579,
+          802,
+          1631,
+          853
+        ]
+      },
+      {
+        "index": 16,
+        "parts": [
+          {
+            "bank": 112,
+            "frame": 0,
+            "x": 1133,
+            "y": 800,
+            "width": 52,
+            "height": 51,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1133,
+          800,
+          1185,
+          851
+        ]
+      },
+      {
+        "index": 17,
+        "parts": [
+          {
+            "bank": 89,
+            "frame": 0,
+            "x": 1306,
+            "y": 614,
+            "width": 80,
+            "height": 64,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1306,
+          614,
+          1386,
+          678
+        ]
+      },
+      {
+        "index": 18,
+        "parts": [
+          {
+            "bank": 89,
+            "frame": 0,
+            "x": 1880,
+            "y": 415,
+            "width": 80,
+            "height": 64,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1880,
+          415,
+          1960,
+          479
+        ]
+      },
+      {
+        "index": 19,
+        "parts": [
+          {
+            "bank": 151,
+            "frame": 1,
+            "x": 1444,
+            "y": 523,
+            "width": 188,
+            "height": 137,
+            "mirrored": false
+          },
+          {
+            "bank": 151,
+            "frame": 7,
+            "x": 1573,
+            "y": 592,
+            "width": 56,
+            "height": 63,
+            "mirrored": false
+          },
+          {
+            "bank": 151,
+            "frame": 14,
+            "x": 1447,
+            "y": 617,
+            "width": 68,
+            "height": 39,
+            "mirrored": false
+          },
+          {
+            "bank": 151,
+            "frame": 0,
+            "x": 1437,
+            "y": 518,
+            "width": 204,
+            "height": 148,
+            "mirrored": false
+          }
+        ],
+        "bounds": [
+          1437,
+          518,
+          1641,
+          666
+        ]
+      }
+    ]
+  },
+  "reference_image": {
+    "map_origin_px": [
+      -384,
+      -136
+    ],
+    "scale": 1,
+    "markers": [
+      {
+        "index": 0,
+        "label": "0",
+        "label_center_px": [
+          511,
+          500
+        ]
+      },
+      {
+        "index": 1,
+        "label": "1",
+        "label_center_px": [
+          511,
+          344
+        ]
+      },
+      {
+        "index": 2,
+        "label": "EXIT 2",
+        "label_center_px": [
+          106,
+          549
+        ]
+      },
+      {
+        "index": 3,
+        "label": "3",
+        "label_center_px": [
+          143,
+          375
+        ]
+      },
+      {
+        "index": 4,
+        "label": "4",
+        "label_center_px": [
+          608,
+          360
+        ]
+      },
+      {
+        "index": 5,
+        "label": "5",
+        "label_center_px": [
+          242,
+          397
+        ]
+      },
+      {
+        "index": 6,
+        "label": "6",
+        "label_center_px": [
+          832,
+          736
+        ]
+      },
+      {
+        "index": 7,
+        "label": "7",
+        "label_center_px": [
+          1088,
+          736
+        ]
+      },
+      {
+        "index": 8,
+        "label": "8",
+        "label_center_px": [
+          1344,
+          736
+        ]
+      },
+      {
+        "index": 9,
+        "label": "9",
+        "label_center_px": [
+          1981,
+          441
+        ]
+      },
+      {
+        "index": 10,
+        "label": "10",
+        "label_center_px": [
+          830,
+          267
+        ]
+      },
+      {
+        "index": 11,
+        "label": "11",
+        "label_center_px": [
+          832,
+          389
+        ]
+      },
+      {
+        "index": 12,
+        "label": "12",
+        "label_center_px": [
+          1341,
+          396
+        ]
+      },
+      {
+        "index": 13,
+        "label": "13",
+        "label_center_px": [
+          1344,
+          262
+        ]
+      },
+      {
+        "index": 14,
+        "label": "14",
+        "label_center_px": [
+          1726,
+          637
+        ]
+      },
+      {
+        "index": 15,
+        "label": "15",
+        "label_center_px": [
+          1219,
+          642
+        ]
+      },
+      {
+        "index": 16,
+        "label": "16",
+        "label_center_px": [
+          773,
+          640
+        ]
+      },
+      {
+        "index": 17,
+        "label": "17",
+        "label_center_px": [
+          959,
+          454
+        ]
+      },
+      {
+        "index": 18,
+        "label": "18",
+        "label_center_px": [
+          1533,
+          255
+        ]
+      },
+      {
+        "index": 19,
+        "label": "19",
+        "label_center_px": [
+          1152,
+          358
+        ]
+      }
+    ],
+    "note": "Lighting-off object reference, cropped to the base; no live simulation."
+  }
 }

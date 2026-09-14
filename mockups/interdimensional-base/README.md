@@ -10,14 +10,14 @@ or production-ready environment. Only this base is included.
 
 | File | Purpose |
 | --- | --- |
-| `START-HERE.png` | Artist sheet: 3D overview, original tiles and design boundaries |
+| `START-HERE.png` | Artist sheet: 3D overview, original object reference and design boundaries |
 | `interdimensional-base.blend` | Editable scene, named collections, materials, three cameras and packed source reference |
 | `interdimensional-base.glb` | Portable mesh/material handoff; import into Blender or another glTF-capable DCC |
 | `01-cutaway.png` | Full-base three-quarter view |
 | `02-front-elevation.png` | Orthographic side-on layout view |
 | `03-operations-detail.png` | Closer view of operations and the lower tech room |
-| `source-reference.png` | Original unlit tile composite with numbered source actor anchors |
-| `source-tiles.png` | Full-size unlit tile composite, also packed into the Blender scene |
+| `source-reference.png` | Lighting-off map with original game-object sprites and numbered source markers |
+| `source-tiles.png` | Clean, full-size tile-only image, also packed into the Blender scene |
 | `source-map.json` | Source checksum, all platform coordinates and all actor records |
 | `scene-manifest.json` | Generated scene inventory |
 
@@ -43,12 +43,23 @@ secret-return chamber. Wall-defense mounts occupy the nine encoded positions.
 The base exit remains against the left wall; it has not been replaced with
 an invented central portal.
 
-The tile reference follows the engine's tile decoding and palette 0, with
+The source references follow the engine's tile decoding and palette 0, with
 **lighting off**. Tiles with a nonzero luminance byte are light masks and
 are excluded rather than drawn as opaque grey gradients. Non-light tiles
 on every layer remain visible. The manifest records omitted light-tile
-counts by layer. Actor sprites, parallax and runtime lighting are also
-omitted, so this is **not a game screenshot**.
+counts by layer. Parallax and runtime lighting are omitted, so this is
+**not a game screenshot**. `source-tiles.png` stays tile-only.
+`source-reference.png` adds the original equipment sprites at their signed
+sprite anchors, including the three tech-station panel variants. The base
+exit has an explicit `EXIT` marker because its runtime object is not drawn.
+This base has no player-start actors; player spawn locations in the main
+levels are marked in cyan in `../levels/`.
+
+Object sprites are composited before foreground tiles. The images use
+representative static frames, without live surveillance feeds, animation or
+runtime team-color effects. The billboard stays neutral. Original sprite
+placements are recorded in `source-map.json`; these are separate from the
+invented 3D prop forms described below.
 The file contains 958 uses of tile `0x0701`, whose bank 7 is
 empty in `BIN_TIL.DAT`; these are not drawn, as in the engine.
 
