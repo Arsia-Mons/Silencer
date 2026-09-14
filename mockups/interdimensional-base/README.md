@@ -111,7 +111,10 @@ Regeneration **overwrites the generated files**; save hand-edited scenes
 under another filename before running it.
 
 The scripts read the original `.SIL` and tile assets without modifying them.
-The decoder is intentionally scoped to this base, not a general `.SIL` importer.
+The shared decoder (`../sil_reference.py`) covers this base and the original
+top-level maps in `shared/assets/level/`; it is not a general `.SIL` importer
+and rejects unsupported trailing sections. The base's scene builder remains
+specific to `XBASE15A.SIL`.
 Source format references:
 `clients/silencer/src/world/map/map.cpp`,
 `clients/silencer/src/resources/resources.cpp`,

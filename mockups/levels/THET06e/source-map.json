@@ -1,0 +1,963 @@
+{
+  "source": "shared/assets/level/THET06e.SIL",
+  "sha256": "2371979ab892135360a3db77a28bedb61ee173e8dd720abd78f0e89cb34ce703",
+  "description": "Don't get caught in the corners with your Secret.",
+  "width_tiles": 46,
+  "height_tiles": 30,
+  "tile_size_px": 64,
+  "actors": [
+    {
+      "id": 54,
+      "x": 1632,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 0,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 1824,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 1,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 2016,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 2,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 2208,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 3,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 2400,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 4,
+      "name": "Terminal"
+    },
+    {
+      "id": 1,
+      "x": 2272,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 5,
+      "name": "Civilian"
+    },
+    {
+      "id": 1,
+      "x": 2592,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 6,
+      "name": "Civilian"
+    },
+    {
+      "id": 36,
+      "x": 1696,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 7,
+      "name": "Player start"
+    },
+    {
+      "id": 36,
+      "x": 1760,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 8,
+      "name": "Player start"
+    },
+    {
+      "id": 36,
+      "x": 2080,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 9,
+      "name": "Player start"
+    },
+    {
+      "id": 36,
+      "x": 2144,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 10,
+      "name": "Player start"
+    },
+    {
+      "id": 36,
+      "x": 2464,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 11,
+      "name": "Player start"
+    },
+    {
+      "id": 36,
+      "x": 2528,
+      "y": 326,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 12,
+      "name": "Player start"
+    },
+    {
+      "id": 54,
+      "x": 1120,
+      "y": 326,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 13,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 1504,
+      "y": 1606,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 14,
+      "name": "Terminal"
+    },
+    {
+      "id": 6,
+      "x": 608,
+      "y": 326,
+      "direction": 1,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 15,
+      "name": "Robot"
+    },
+    {
+      "id": 3,
+      "x": 928,
+      "y": 326,
+      "direction": 1,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 16,
+      "name": "Trooper rocket"
+    },
+    {
+      "id": 54,
+      "x": 1952,
+      "y": 1670,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 17,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 2016,
+      "y": 1670,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 18,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 2080,
+      "y": 1670,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 19,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 2144,
+      "y": 1670,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 20,
+      "name": "Terminal"
+    },
+    {
+      "id": 67,
+      "x": 1184,
+      "y": 1248,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 21,
+      "name": "Wall defense"
+    },
+    {
+      "id": 0,
+      "x": 2720,
+      "y": 838,
+      "direction": 1,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 22,
+      "name": "Guard blaster"
+    },
+    {
+      "id": 0,
+      "x": 2400,
+      "y": 838,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 23,
+      "name": "Guard blaster"
+    },
+    {
+      "id": 6,
+      "x": 2528,
+      "y": 838,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 24,
+      "name": "Robot"
+    },
+    {
+      "id": 54,
+      "x": 1856,
+      "y": 966,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 25,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 1472,
+      "y": 966,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 26,
+      "name": "Terminal"
+    },
+    {
+      "id": 63,
+      "x": 2080,
+      "y": 1344,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 27,
+      "name": "Powerup"
+    }
+  ],
+  "platforms": [
+    {
+      "x1": 320,
+      "y1": 0,
+      "x2": 2943,
+      "y2": 134,
+      "type1": 0,
+      "type2": 0,
+      "index": 0,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1472,
+      "y1": 326,
+      "x2": 2688,
+      "y2": 454,
+      "type1": 0,
+      "type2": 0,
+      "index": 1,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2240,
+      "y1": 1222,
+      "x2": 2368,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 2,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 0,
+      "y1": 0,
+      "x2": 320,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 3,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 320,
+      "y1": 710,
+      "x2": 960,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 4,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 960,
+      "y1": 966,
+      "x2": 1216,
+      "y2": 1222,
+      "type1": 0,
+      "type2": 0,
+      "index": 5,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 960,
+      "y1": 1222,
+      "x2": 1152,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 6,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1728,
+      "y1": 1670,
+      "x2": 2240,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 7,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1600,
+      "y1": 838,
+      "x2": 1728,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 8,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1152,
+      "y1": 1606,
+      "x2": 1600,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 9,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1344,
+      "y1": 774,
+      "x2": 1984,
+      "y2": 838,
+      "type1": 0,
+      "type2": 0,
+      "index": 10,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2240,
+      "y1": 774,
+      "x2": 2304,
+      "y2": 1222,
+      "type1": 0,
+      "type2": 0,
+      "index": 11,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 384,
+      "y1": 326,
+      "x2": 448,
+      "y2": 326,
+      "type1": 0,
+      "type2": 0,
+      "index": 12,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1536,
+      "y1": 966,
+      "x2": 1600,
+      "y2": 966,
+      "type1": 0,
+      "type2": 0,
+      "index": 13,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1728,
+      "y1": 966,
+      "x2": 1792,
+      "y2": 966,
+      "type1": 0,
+      "type2": 0,
+      "index": 14,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1744,
+      "y1": 966,
+      "x2": 1776,
+      "y2": 1670,
+      "type1": 1,
+      "type2": 0,
+      "index": 15,
+      "kind": "ladder"
+    },
+    {
+      "x1": 1552,
+      "y1": 966,
+      "x2": 1584,
+      "y2": 1414,
+      "type1": 1,
+      "type2": 0,
+      "index": 16,
+      "kind": "ladder"
+    },
+    {
+      "x1": 1360,
+      "y1": 1414,
+      "x2": 1392,
+      "y2": 1606,
+      "type1": 1,
+      "type2": 0,
+      "index": 17,
+      "kind": "ladder"
+    },
+    {
+      "x1": 1344,
+      "y1": 1414,
+      "x2": 1408,
+      "y2": 1414,
+      "type1": 0,
+      "type2": 0,
+      "index": 18,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1408,
+      "y1": 1414,
+      "x2": 1600,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 19,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 400,
+      "y1": 326,
+      "x2": 432,
+      "y2": 710,
+      "type1": 1,
+      "type2": 0,
+      "index": 20,
+      "kind": "ladder"
+    },
+    {
+      "x1": 2048,
+      "y1": 966,
+      "x2": 2240,
+      "y2": 1222,
+      "type1": 0,
+      "type2": 0,
+      "index": 21,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2048,
+      "y1": 774,
+      "x2": 2240,
+      "y2": 966,
+      "type1": 0,
+      "type2": 1,
+      "index": 22,
+      "kind": "stairs up"
+    },
+    {
+      "x1": 1792,
+      "y1": 966,
+      "x2": 2048,
+      "y2": 1222,
+      "type1": 0,
+      "type2": 0,
+      "index": 23,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 960,
+      "y1": 710,
+      "x2": 1216,
+      "y2": 966,
+      "type1": 0,
+      "type2": 2,
+      "index": 24,
+      "kind": "stairs down"
+    },
+    {
+      "x1": 1216,
+      "y1": 966,
+      "x2": 1536,
+      "y2": 1222,
+      "type1": 0,
+      "type2": 0,
+      "index": 25,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2304,
+      "y1": 774,
+      "x2": 2368,
+      "y2": 838,
+      "type1": 0,
+      "type2": 2,
+      "index": 26,
+      "kind": "stairs down"
+    },
+    {
+      "x1": 2304,
+      "y1": 838,
+      "x2": 2368,
+      "y2": 1222,
+      "type1": 0,
+      "type2": 0,
+      "index": 27,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2048,
+      "y1": 1414,
+      "x2": 2176,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 28,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2176,
+      "y1": 1414,
+      "x2": 2240,
+      "y2": 1414,
+      "type1": 0,
+      "type2": 0,
+      "index": 29,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2192,
+      "y1": 1414,
+      "x2": 2224,
+      "y2": 1670,
+      "type1": 1,
+      "type2": 0,
+      "index": 30,
+      "kind": "ladder"
+    },
+    {
+      "x1": 2698,
+      "y1": 326,
+      "x2": 2736,
+      "y2": 838,
+      "type1": 1,
+      "type2": 0,
+      "index": 31,
+      "kind": "ladder"
+    },
+    {
+      "x1": 2688,
+      "y1": 326,
+      "x2": 2752,
+      "y2": 326,
+      "type1": 0,
+      "type2": 0,
+      "index": 32,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1920,
+      "y1": 1222,
+      "x2": 2048,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 33,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2816,
+      "y1": 134,
+      "x2": 2943,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 34,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2368,
+      "y1": 838,
+      "x2": 2816,
+      "y2": 1919,
+      "type1": 0,
+      "type2": 0,
+      "index": 35,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1280,
+      "y1": 134,
+      "x2": 1472,
+      "y2": 454,
+      "type1": 0,
+      "type2": 0,
+      "index": 36,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 448,
+      "y1": 326,
+      "x2": 1280,
+      "y2": 454,
+      "type1": 0,
+      "type2": 0,
+      "index": 37,
+      "kind": "rectangle"
+    }
+  ],
+  "undrawn_tiles": [],
+  "reference_image": {
+    "map_origin_px": [
+      40,
+      150
+    ],
+    "scale": 1,
+    "markers": [
+      {
+        "index": 0,
+        "label_center_px": [
+          1672,
+          444
+        ]
+      },
+      {
+        "index": 1,
+        "label_center_px": [
+          1864,
+          444
+        ]
+      },
+      {
+        "index": 2,
+        "label_center_px": [
+          2056,
+          444
+        ]
+      },
+      {
+        "index": 3,
+        "label_center_px": [
+          2248,
+          444
+        ]
+      },
+      {
+        "index": 4,
+        "label_center_px": [
+          2440,
+          444
+        ]
+      },
+      {
+        "index": 5,
+        "label_center_px": [
+          2312,
+          444
+        ]
+      },
+      {
+        "index": 6,
+        "label_center_px": [
+          2632,
+          444
+        ]
+      },
+      {
+        "index": 7,
+        "label_center_px": [
+          1736,
+          444
+        ]
+      },
+      {
+        "index": 8,
+        "label_center_px": [
+          1800,
+          444
+        ]
+      },
+      {
+        "index": 9,
+        "label_center_px": [
+          2120,
+          444
+        ]
+      },
+      {
+        "index": 10,
+        "label_center_px": [
+          2184,
+          444
+        ]
+      },
+      {
+        "index": 11,
+        "label_center_px": [
+          2504,
+          444
+        ]
+      },
+      {
+        "index": 12,
+        "label_center_px": [
+          2568,
+          444
+        ]
+      },
+      {
+        "index": 13,
+        "label_center_px": [
+          1160,
+          444
+        ]
+      },
+      {
+        "index": 14,
+        "label_center_px": [
+          1544,
+          1724
+        ]
+      },
+      {
+        "index": 15,
+        "label_center_px": [
+          648,
+          444
+        ]
+      },
+      {
+        "index": 16,
+        "label_center_px": [
+          968,
+          444
+        ]
+      },
+      {
+        "index": 17,
+        "label_center_px": [
+          1992,
+          1788
+        ]
+      },
+      {
+        "index": 18,
+        "label_center_px": [
+          2056,
+          1788
+        ]
+      },
+      {
+        "index": 19,
+        "label_center_px": [
+          2120,
+          1788
+        ]
+      },
+      {
+        "index": 20,
+        "label_center_px": [
+          2184,
+          1788
+        ]
+      },
+      {
+        "index": 21,
+        "label_center_px": [
+          1224,
+          1366
+        ]
+      },
+      {
+        "index": 22,
+        "label_center_px": [
+          2760,
+          956
+        ]
+      },
+      {
+        "index": 23,
+        "label_center_px": [
+          2440,
+          956
+        ]
+      },
+      {
+        "index": 24,
+        "label_center_px": [
+          2568,
+          956
+        ]
+      },
+      {
+        "index": 25,
+        "label_center_px": [
+          1896,
+          1084
+        ]
+      },
+      {
+        "index": 26,
+        "label_center_px": [
+          1512,
+          1084
+        ]
+      },
+      {
+        "index": 27,
+        "label_center_px": [
+          2120,
+          1462
+        ]
+      }
+    ],
+    "note": "Original tile layers only; actor sprites, parallax and runtime luminosity omitted."
+  }
+}

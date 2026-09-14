@@ -1,0 +1,843 @@
+{
+  "source": "shared/assets/level/EASY05c.SIL",
+  "sha256": "d9504d4c1ee5d3d7dcc10d9aa682c6638df29b9f0c4402629dbc07d4b96e9f95",
+  "description": "Small, Fast, and Furious.  Don't say you weren't warned.",
+  "width_tiles": 34,
+  "height_tiles": 24,
+  "tile_size_px": 64,
+  "actors": [
+    {
+      "id": 54,
+      "x": 128,
+      "y": 582,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 0,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 256,
+      "y": 582,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 1,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 128,
+      "y": 838,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 2,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 256,
+      "y": 838,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 3,
+      "name": "Terminal"
+    },
+    {
+      "id": 36,
+      "x": 672,
+      "y": 1094,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 4,
+      "name": "Player start"
+    },
+    {
+      "id": 36,
+      "x": 736,
+      "y": 1094,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 5,
+      "name": "Player start"
+    },
+    {
+      "id": 36,
+      "x": 800,
+      "y": 1094,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 6,
+      "name": "Player start"
+    },
+    {
+      "id": 36,
+      "x": 864,
+      "y": 1094,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 7,
+      "name": "Player start"
+    },
+    {
+      "id": 1,
+      "x": 160,
+      "y": 582,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 8,
+      "name": "Civilian"
+    },
+    {
+      "id": 1,
+      "x": 160,
+      "y": 838,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 9,
+      "name": "Civilian"
+    },
+    {
+      "id": 54,
+      "x": 1696,
+      "y": 902,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 10,
+      "name": "Terminal"
+    },
+    {
+      "id": 64,
+      "x": 768,
+      "y": 1094,
+      "direction": 0,
+      "type": 0,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 11,
+      "name": "Vent"
+    },
+    {
+      "id": 47,
+      "x": 1760,
+      "y": 902,
+      "direction": 0,
+      "type": 2,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 12,
+      "name": "Doodad"
+    },
+    {
+      "id": 47,
+      "x": 1568,
+      "y": 902,
+      "direction": 0,
+      "type": 3,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 13,
+      "name": "Doodad"
+    },
+    {
+      "id": 47,
+      "x": 1504,
+      "y": 902,
+      "direction": 0,
+      "type": 3,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 14,
+      "name": "Doodad"
+    },
+    {
+      "id": 47,
+      "x": 1760,
+      "y": 710,
+      "direction": 0,
+      "type": 3,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 15,
+      "name": "Doodad"
+    },
+    {
+      "id": 47,
+      "x": 1760,
+      "y": 454,
+      "direction": 0,
+      "type": 3,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 16,
+      "name": "Doodad"
+    },
+    {
+      "id": 47,
+      "x": 1504,
+      "y": 406,
+      "direction": 0,
+      "type": 4,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 17,
+      "name": "Doodad"
+    },
+    {
+      "id": 47,
+      "x": 1376,
+      "y": 662,
+      "direction": 0,
+      "type": 4,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 18,
+      "name": "Doodad"
+    },
+    {
+      "id": 0,
+      "x": 1904,
+      "y": 454,
+      "direction": 1,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 19,
+      "name": "Guard blaster"
+    },
+    {
+      "id": 0,
+      "x": 1904,
+      "y": 710,
+      "direction": 1,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 20,
+      "name": "Guard blaster"
+    },
+    {
+      "id": 54,
+      "x": 1984,
+      "y": 710,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 21,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 1984,
+      "y": 454,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 22,
+      "name": "Terminal"
+    },
+    {
+      "id": 54,
+      "x": 192,
+      "y": 326,
+      "direction": 0,
+      "type": 1,
+      "matchid": 0,
+      "subplane": 0,
+      "unknown": 28275716,
+      "securityid": 0,
+      "index": 23,
+      "name": "Terminal"
+    }
+  ],
+  "platforms": [
+    {
+      "x1": 1536,
+      "y1": 454,
+      "x2": 2048,
+      "y2": 518,
+      "type1": 0,
+      "type2": 0,
+      "index": 0,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1408,
+      "y1": 710,
+      "x2": 1792,
+      "y2": 774,
+      "type1": 0,
+      "type2": 0,
+      "index": 1,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1344,
+      "y1": 710,
+      "x2": 1408,
+      "y2": 710,
+      "type1": 0,
+      "type2": 0,
+      "index": 2,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1472,
+      "y1": 454,
+      "x2": 1536,
+      "y2": 454,
+      "type1": 0,
+      "type2": 0,
+      "index": 3,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1088,
+      "y1": 902,
+      "x2": 1792,
+      "y2": 966,
+      "type1": 0,
+      "type2": 0,
+      "index": 4,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1088,
+      "y1": 966,
+      "x2": 1856,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 5,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 896,
+      "y1": 1094,
+      "x2": 1088,
+      "y2": 1158,
+      "type1": 0,
+      "type2": 0,
+      "index": 6,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 64,
+      "y1": 838,
+      "x2": 384,
+      "y2": 1158,
+      "type1": 0,
+      "type2": 0,
+      "index": 7,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1360,
+      "y1": 710,
+      "x2": 1392,
+      "y2": 902,
+      "type1": 1,
+      "type2": 0,
+      "index": 8,
+      "kind": "ladder"
+    },
+    {
+      "x1": 1488,
+      "y1": 454,
+      "x2": 1520,
+      "y2": 710,
+      "type1": 1,
+      "type2": 0,
+      "index": 9,
+      "kind": "ladder"
+    },
+    {
+      "x1": 896,
+      "y1": 902,
+      "x2": 1088,
+      "y2": 1094,
+      "type1": 0,
+      "type2": 1,
+      "index": 10,
+      "kind": "stairs up"
+    },
+    {
+      "x1": 384,
+      "y1": 1094,
+      "x2": 640,
+      "y2": 1158,
+      "type1": 0,
+      "type2": 0,
+      "index": 11,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 384,
+      "y1": 838,
+      "x2": 640,
+      "y2": 1094,
+      "type1": 0,
+      "type2": 2,
+      "index": 12,
+      "kind": "stairs down"
+    },
+    {
+      "x1": 640,
+      "y1": 1094,
+      "x2": 896,
+      "y2": 1158,
+      "type1": 0,
+      "type2": 0,
+      "index": 13,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 64,
+      "y1": 582,
+      "x2": 320,
+      "y2": 646,
+      "type1": 0,
+      "type2": 0,
+      "index": 14,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 320,
+      "y1": 582,
+      "x2": 384,
+      "y2": 582,
+      "type1": 0,
+      "type2": 0,
+      "index": 15,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 336,
+      "y1": 582,
+      "x2": 368,
+      "y2": 838,
+      "type1": 1,
+      "type2": 0,
+      "index": 16,
+      "kind": "ladder"
+    },
+    {
+      "x1": 64,
+      "y1": 326,
+      "x2": 576,
+      "y2": 390,
+      "type1": 0,
+      "type2": 0,
+      "index": 17,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2048,
+      "y1": 326,
+      "x2": 2111,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 18,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2111,
+      "y1": 326,
+      "x2": 2112,
+      "y2": 454,
+      "type1": 0,
+      "type2": 0,
+      "index": 19,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1792,
+      "y1": 710,
+      "x2": 1856,
+      "y2": 966,
+      "type1": 0,
+      "type2": 0,
+      "index": 20,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1856,
+      "y1": 710,
+      "x2": 2048,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 21,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 832,
+      "y1": 6,
+      "x2": 2112,
+      "y2": 326,
+      "type1": 0,
+      "type2": 0,
+      "index": 22,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 832,
+      "y1": 326,
+      "x2": 960,
+      "y2": 646,
+      "type1": 0,
+      "type2": 0,
+      "index": 23,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 384,
+      "y1": 582,
+      "x2": 832,
+      "y2": 646,
+      "type1": 0,
+      "type2": 0,
+      "index": 24,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 64,
+      "y1": 6,
+      "x2": 832,
+      "y2": 134,
+      "type1": 0,
+      "type2": 0,
+      "index": 25,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1168,
+      "y1": 470,
+      "x2": 1216,
+      "y2": 694,
+      "type1": 0,
+      "type2": 0,
+      "index": 26,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 512,
+      "y1": 390,
+      "x2": 576,
+      "y2": 438,
+      "type1": 0,
+      "type2": 0,
+      "index": 27,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 512,
+      "y1": 134,
+      "x2": 576,
+      "y2": 182,
+      "type1": 0,
+      "type2": 0,
+      "index": 28,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 0,
+      "y1": 1158,
+      "x2": 1088,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 29,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 0,
+      "y1": 6,
+      "x2": 64,
+      "y2": 1158,
+      "type1": 0,
+      "type2": 0,
+      "index": 30,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 1216,
+      "y1": 326,
+      "x2": 1280,
+      "y2": 710,
+      "type1": 0,
+      "type2": 0,
+      "index": 31,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2111,
+      "y1": 1286,
+      "x2": 2112,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 32,
+      "kind": "rectangle"
+    },
+    {
+      "x1": 2112,
+      "y1": 6,
+      "x2": 2175,
+      "y2": 1478,
+      "type1": 0,
+      "type2": 0,
+      "index": 33,
+      "kind": "rectangle"
+    }
+  ],
+  "undrawn_tiles": [],
+  "reference_image": {
+    "map_origin_px": [
+      40,
+      150
+    ],
+    "scale": 1,
+    "markers": [
+      {
+        "index": 0,
+        "label_center_px": [
+          168,
+          700
+        ]
+      },
+      {
+        "index": 1,
+        "label_center_px": [
+          296,
+          700
+        ]
+      },
+      {
+        "index": 2,
+        "label_center_px": [
+          168,
+          956
+        ]
+      },
+      {
+        "index": 3,
+        "label_center_px": [
+          296,
+          956
+        ]
+      },
+      {
+        "index": 4,
+        "label_center_px": [
+          712,
+          1212
+        ]
+      },
+      {
+        "index": 5,
+        "label_center_px": [
+          776,
+          1212
+        ]
+      },
+      {
+        "index": 6,
+        "label_center_px": [
+          840,
+          1212
+        ]
+      },
+      {
+        "index": 7,
+        "label_center_px": [
+          904,
+          1212
+        ]
+      },
+      {
+        "index": 8,
+        "label_center_px": [
+          245,
+          700
+        ]
+      },
+      {
+        "index": 9,
+        "label_center_px": [
+          245,
+          956
+        ]
+      },
+      {
+        "index": 10,
+        "label_center_px": [
+          1736,
+          1020
+        ]
+      },
+      {
+        "index": 11,
+        "label_center_px": [
+          808,
+          1282
+        ]
+      },
+      {
+        "index": 12,
+        "label_center_px": [
+          1800,
+          1020
+        ]
+      },
+      {
+        "index": 13,
+        "label_center_px": [
+          1608,
+          1020
+        ]
+      },
+      {
+        "index": 14,
+        "label_center_px": [
+          1544,
+          1020
+        ]
+      },
+      {
+        "index": 15,
+        "label_center_px": [
+          1800,
+          828
+        ]
+      },
+      {
+        "index": 16,
+        "label_center_px": [
+          1800,
+          572
+        ]
+      },
+      {
+        "index": 17,
+        "label_center_px": [
+          1544,
+          524
+        ]
+      },
+      {
+        "index": 18,
+        "label_center_px": [
+          1416,
+          780
+        ]
+      },
+      {
+        "index": 19,
+        "label_center_px": [
+          1944,
+          572
+        ]
+      },
+      {
+        "index": 20,
+        "label_center_px": [
+          1944,
+          828
+        ]
+      },
+      {
+        "index": 21,
+        "label_center_px": [
+          2024,
+          828
+        ]
+      },
+      {
+        "index": 22,
+        "label_center_px": [
+          2024,
+          572
+        ]
+      },
+      {
+        "index": 23,
+        "label_center_px": [
+          232,
+          444
+        ]
+      }
+    ],
+    "note": "Original tile layers only; actor sprites, parallax and runtime luminosity omitted."
+  }
+}
