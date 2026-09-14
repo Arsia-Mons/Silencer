@@ -9,10 +9,10 @@ import bpy
 from mathutils import Vector
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-from source_map import read_map
+sys.path.insert(0, str(HERE.parent))
+from sil_reference import ASSETS, read_map
 
-SOURCE, _ = read_map()
+SOURCE, _ = read_map(ASSETS / "XBASE15A.SIL")
 SCENE = bpy.context.scene
 
 

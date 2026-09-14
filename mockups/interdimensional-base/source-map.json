@@ -1,16 +1,10 @@
 {
   "source": "shared/assets/XBASE15A.SIL",
   "sha256": "d107bf1662f485c637127e123e300bb8d0c6c9fa8a5ec9762a52b967c85dc712",
+  "description": "",
   "width_tiles": 47,
   "height_tiles": 26,
   "tile_size_px": 64,
-  "coordinate_transform": {
-    "x_m": "(source_x - 448) / 64",
-    "z_m": "(1094 - source_y) / 64",
-    "y_m": "invented depth; front -2, rear +2"
-  },
-  "scale_note": "One 64px tile = one design metre; not an original physical scale.",
-  "tile_reference_note": "Unlit tile composite, without sprites or parallax. Tile 0x0701 refers to empty bank 7 and is not drawn, matching the engine's missing-surface behavior.",
   "actors": [
     {
       "id": 70,
@@ -443,6 +437,20 @@
       "type2": 0,
       "index": 16,
       "kind": "rectangle"
+    }
+  ],
+  "coordinate_transform": {
+    "x_m": "(source_x - 448) / 64",
+    "z_m": "(1094 - source_y) / 64",
+    "y_m": "invented depth; front -2, rear +2"
+  },
+  "scale_note": "One 64px tile = one design metre; not an original physical scale.",
+  "tile_reference_note": "Unlit tile composite, without sprites or parallax. Tile 0x0701 refers to empty bank 7 and is not drawn, matching the engine's missing-surface behavior.",
+  "undrawn_tiles": [
+    {
+      "tile_id": "0x0701",
+      "count": 958,
+      "reason": "empty bank in BIN_TIL.DAT"
     }
   ]
 }
