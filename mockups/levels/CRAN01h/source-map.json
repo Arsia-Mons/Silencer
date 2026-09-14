@@ -2319,6 +2319,17 @@
       "kind": "rectangle"
     }
   ],
+  "lighting": {
+    "enabled": false,
+    "omitted_tile_references": 919,
+    "omitted_by_layer": {
+      "bg2": 21,
+      "bg3": 69,
+      "fg1": 248,
+      "fg2": 581
+    },
+    "rule": "Omit every tile with a nonzero luminance byte; preserve non-light tiles on all eight layers."
+  },
   "undrawn_tiles": [],
   "reference_image": {
     "map_origin_px": [
@@ -3028,6 +3039,6 @@
         ]
       }
     ],
-    "note": "Original tile layers only; actor sprites, parallax and runtime luminosity omitted."
+    "note": "Lighting off: luminance-marked tiles, actor sprites, parallax and runtime lighting omitted."
   }
 }

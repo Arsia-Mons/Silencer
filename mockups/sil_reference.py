@@ -133,14 +133,18 @@ def render_tiles(manifest, raw):
     palette = bytes((value << 2) & 255
                     for value in (ASSETS / "PALETTE.BIN").read_bytes()[4:772])
     counts = (ASSETS / "BIN_TIL.DAT").read_bytes()
-    banks, missing = {}, Counter()
+    banks, missing, lights = {}, Counter(), Counter()
     reference = Image.new("RGBA", (width * 64, height * 64), "#070b14")
-    # Actors are annotated separately. Parallax and runtime luminosity are
-    # deliberately omitted so the reference exposes the original tile artwork.
+    # The engine sends nonzero-LUM tiles to DrawLight, not DrawTile. Exclude
+    # those masks rather than painting their grayscale pixels over the artwork.
     for layer_offset in (0, 4, 8, 12, 20, 24, 28, 32):
         for i in range(width * height):
-            tile, flip, _lum = struct.unpack_from("<HBB", raw, i * 36 + layer_offset)
+            tile, flip, lum = struct.unpack_from("<HBB", raw, i * 36 + layer_offset)
             if not tile:
+                continue
+            if lum:
+                layer = f"bg{layer_offset // 4}" if layer_offset < 16 else f"fg{(layer_offset - 20) // 4}"
+                lights[layer] += 1
                 continue
             bank, frame = tile >> 8, tile & 255
             count = counts[bank * 64 + 2]
@@ -155,6 +159,12 @@ def render_tiles(manifest, raw):
             if flip:
                 image = image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
             reference.alpha_composite(image, (i % width * 64, i // width * 64))
+    manifest["lighting"] = {
+        "enabled": False,
+        "omitted_tile_references": sum(lights.values()),
+        "omitted_by_layer": dict(lights),
+        "rule": "Omit every tile with a nonzero luminance byte; preserve non-light tiles on all eight layers.",
+    }
     manifest["undrawn_tiles"] = [
         {"tile_id": f"0x{tile:04X}", "count": count, "reason": "empty bank in BIN_TIL.DAT"}
         for tile, count in sorted(missing.items())

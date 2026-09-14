@@ -2637,18 +2637,19 @@
       "kind": "rectangle"
     }
   ],
-  "undrawn_tiles": [
-    {
-      "tile_id": "0x6214",
-      "count": 2,
-      "reason": "empty bank in BIN_TIL.DAT"
+  "lighting": {
+    "enabled": false,
+    "omitted_tile_references": 820,
+    "omitted_by_layer": {
+      "bg0": 3,
+      "bg2": 22,
+      "fg1": 146,
+      "fg2": 622,
+      "fg3": 27
     },
-    {
-      "tile_id": "0x6215",
-      "count": 1,
-      "reason": "empty bank in BIN_TIL.DAT"
-    }
-  ],
+    "rule": "Omit every tile with a nonzero luminance byte; preserve non-light tiles on all eight layers."
+  },
+  "undrawn_tiles": [],
   "reference_image": {
     "map_origin_px": [
       40,
@@ -3399,6 +3400,6 @@
         ]
       }
     ],
-    "note": "Original tile layers only; actor sprites, parallax and runtime luminosity omitted."
+    "note": "Lighting off: luminance-marked tiles, actor sprites, parallax and runtime lighting omitted."
   }
 }

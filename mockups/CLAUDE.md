@@ -10,6 +10,9 @@ See `interdimensional-base/README.md` for the regeneration commands.
 base and level references. Run `python3 mockups/generate_level_references.py`
 from the repo root to regenerate `levels/`; its non-recursive `*.SIL` glob
 intentionally excludes `shared/assets/level/community/`.
+Source images omit every tile with a nonzero per-cell luminance byte:
+these are light masks, not opaque artwork. Keep non-light tiles on all layers;
+do not hide entire layers or banks to turn lighting off.
 
 Preserve source collision coordinates and actor anchors. Keep invented
 depth, materials, props and presentation in separate Blender collections,

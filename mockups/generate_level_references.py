@@ -29,7 +29,7 @@ def render_reference(manifest, tiles):
     draw.text((MARGIN, 76), manifest["description"], font=body, fill="#c5dbea")
     draw.text((MARGIN, 112),
               f"ORIGINAL TILES + ACTOR ANCHORS  /  {width} x {height}px  /  "
-              f"{len(actors)} ACTORS  /  UNLIT REFERENCE, NOT A GAME SCREENSHOT",
+              f"{len(actors)} ACTORS  /  LIGHTING OFF, NOT A GAME SCREENSHOT",
               font=small, fill="#88adc1")
 
     placed = []
@@ -73,7 +73,7 @@ def render_reference(manifest, tiles):
         "map_origin_px": [MARGIN, HEADER],
         "scale": 1,
         "markers": marker_positions,
-        "note": "Original tile layers only; actor sprites, parallax and runtime luminosity omitted.",
+        "note": "Lighting off: luminance-marked tiles, actor sprites, parallax and runtime lighting omitted.",
     }
     return board
 

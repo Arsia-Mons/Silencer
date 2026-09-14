@@ -43,9 +43,13 @@ secret-return chamber. Wall-defense mounts occupy the nine encoded positions.
 The base exit remains against the left wall; it has not been replaced with
 an invented central portal.
 
-The tile reference follows the engine's tile decoding and palette 0. It
-omits actor sprites, parallax and runtime luminosity, so it is **not a game
-screenshot**. The file contains 958 uses of tile `0x0701`, whose bank 7 is
+The tile reference follows the engine's tile decoding and palette 0, with
+**lighting off**. Tiles with a nonzero luminance byte are light masks and
+are excluded rather than drawn as opaque grey gradients. Non-light tiles
+on every layer remain visible. The manifest records omitted light-tile
+counts by layer. Actor sprites, parallax and runtime lighting are also
+omitted, so this is **not a game screenshot**.
+The file contains 958 uses of tile `0x0701`, whose bank 7 is
 empty in `BIN_TIL.DAT`; these are not drawn, as in the engine.
 
 ## Intentional interpretation

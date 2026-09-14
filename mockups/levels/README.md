@@ -13,8 +13,9 @@ images, not new 3D mockups.
 | THET06e | [source-tiles.png](THET06e/source-tiles.png) | [source-reference.png](THET06e/source-reference.png) | 2944 x 1920 |
 
 `source-tiles.png` is the complete, uncropped map at its original resolution,
-with all four background and four foreground tile layers composited using
-palette 0. It uses the same tile renderer as the interdimensional base.
+with **lighting off**. All non-light tiles from the four background and four
+foreground layers are composited using palette 0. It uses the same tile
+renderer as the interdimensional base.
 
 `source-reference.png` adds the map description, numbered actor anchors and
 an actor-type legend. The map remains at **1:1 scale**, inset 40px from the
@@ -23,12 +24,16 @@ Leader lines point to the original actor positions; labels are shifted to
 avoid overlapping each other.
 
 Each folder also includes `source-map.json`, recording the source SHA-256,
-dimensions, complete actor/platform records, label locations and any undrawn
-tile references. Numbers on the reference sheet are the **zero-based actor
+dimensions, complete actor/platform records, label locations, omitted
+light-tile counts per layer and any missing tile references.
+Numbers on the reference sheet are the **zero-based actor
 indices** in this file, not actor type IDs.
 
-As with the base, these are **unlit tile references**, not gameplay screenshots.
-They omit actor sprites, parallax backgrounds and runtime luminosity.
+As with the base, these are **lighting-off tile references**, not gameplay
+screenshots. Every tile with a nonzero luminance byte is a light-pass tile
+in the engine and is omitted, exposing the artwork beneath the grey gradients.
+Non-light tiles on the same layers and in the same banks remain visible.
+Actor sprites, parallax backgrounds and runtime lighting are also omitted.
 No source `.SIL` or runtime asset is modified.
 
 ## Original-data notes
@@ -38,8 +43,8 @@ current engine map loader or designer actor catalogue. Its anchors and raw
 records are preserved and explicitly labeled `Unknown actor ID 60`.
 
 STAR72 references tile bank 98 three times (`0x6214` twice and `0x6215` once),
-but `BIN_TIL.DAT` marks that bank empty. Those tiles are not drawn, matching
-the engine's missing-surface behavior; the manifest records the omissions.
+but `BIN_TIL.DAT` marks that bank empty. These three references also carry
+the luminance flag and are excluded with the other light tiles.
 STAR72 also contains one unrecognized `(3, 2)` platform record, preserved
 without guessing its meaning. Platform geometry is not painted over the tiles.
 
