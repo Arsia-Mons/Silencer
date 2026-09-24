@@ -1,0 +1,580 @@
+{
+  "palette": 0,
+  "palette_sha256": "dcc736f13e61dbdd0af93ca7b442bc1f9ccd6ffac2c04defef7945a134b8abc0",
+  "gutter_px": 4,
+  "scale": 1,
+  "sheets": [
+    {
+      "file": "small-terminal.png",
+      "source": "shared/assets/bin_spr/SPR_183.BIN",
+      "source_sha256": "950a505581e13d32d62af7b032e12264f66589c9de28edeb9196dec68296398a",
+      "bank": 183,
+      "size_px": [
+        304,
+        156
+      ],
+      "cell_size_px": [
+        56,
+        72
+      ],
+      "cell_origin_px": [
+        27,
+        73
+      ],
+      "columns": 5,
+      "rows": 2,
+      "frames": [
+        {
+          "index": 0,
+          "state": "inactive",
+          "row": 0,
+          "column": 0,
+          "rect": [
+            4,
+            4,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 1,
+          "state": "inactive",
+          "row": 0,
+          "column": 1,
+          "rect": [
+            64,
+            4,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 2,
+          "state": "inactive",
+          "row": 0,
+          "column": 2,
+          "rect": [
+            124,
+            4,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 3,
+          "state": "inactive",
+          "row": 0,
+          "column": 3,
+          "rect": [
+            184,
+            4,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 4,
+          "state": "inactive",
+          "row": 0,
+          "column": 4,
+          "rect": [
+            244,
+            4,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 5,
+          "state": "ready-hacking",
+          "row": 1,
+          "column": 0,
+          "rect": [
+            4,
+            80,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 6,
+          "state": "ready-hacking",
+          "row": 1,
+          "column": 1,
+          "rect": [
+            64,
+            80,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 7,
+          "state": "ready-hacking",
+          "row": 1,
+          "column": 2,
+          "rect": [
+            124,
+            80,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 8,
+          "state": "ready-hacking",
+          "row": 1,
+          "column": 3,
+          "rect": [
+            184,
+            80,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        },
+        {
+          "index": 9,
+          "state": "ready-hacking",
+          "row": 1,
+          "column": 4,
+          "rect": [
+            244,
+            80,
+            56,
+            72
+          ],
+          "origin": [
+            27,
+            73
+          ]
+        }
+      ]
+    },
+    {
+      "file": "large-terminal.png",
+      "source": "shared/assets/bin_spr/SPR_184.BIN",
+      "source_sha256": "0b236c3f9c1865151e6f1af50abcd6184f408d1c05a33ac85f0525502888ab81",
+      "bank": 184,
+      "size_px": [
+        1120,
+        286
+      ],
+      "cell_size_px": [
+        120,
+        90
+      ],
+      "cell_origin_px": [
+        59,
+        91
+      ],
+      "columns": 9,
+      "rows": 3,
+      "frames": [
+        {
+          "index": 0,
+          "state": "inactive",
+          "row": 0,
+          "column": 0,
+          "rect": [
+            4,
+            4,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 1,
+          "state": "inactive",
+          "row": 0,
+          "column": 1,
+          "rect": [
+            128,
+            4,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 2,
+          "state": "inactive",
+          "row": 0,
+          "column": 2,
+          "rect": [
+            252,
+            4,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 3,
+          "state": "inactive",
+          "row": 0,
+          "column": 3,
+          "rect": [
+            376,
+            4,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 4,
+          "state": "inactive",
+          "row": 0,
+          "column": 4,
+          "rect": [
+            500,
+            4,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 5,
+          "state": "beaming",
+          "row": 1,
+          "column": 0,
+          "rect": [
+            4,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 6,
+          "state": "beaming",
+          "row": 1,
+          "column": 1,
+          "rect": [
+            128,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 7,
+          "state": "beaming",
+          "row": 1,
+          "column": 2,
+          "rect": [
+            252,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 8,
+          "state": "beaming",
+          "row": 1,
+          "column": 3,
+          "rect": [
+            376,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 9,
+          "state": "beaming",
+          "row": 1,
+          "column": 4,
+          "rect": [
+            500,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 10,
+          "state": "beaming",
+          "row": 1,
+          "column": 5,
+          "rect": [
+            624,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 11,
+          "state": "beaming",
+          "row": 1,
+          "column": 6,
+          "rect": [
+            748,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 12,
+          "state": "beaming",
+          "row": 1,
+          "column": 7,
+          "rect": [
+            872,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 13,
+          "state": "beaming",
+          "row": 1,
+          "column": 8,
+          "rect": [
+            996,
+            98,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 14,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 0,
+          "rect": [
+            4,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 15,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 1,
+          "rect": [
+            128,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 16,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 2,
+          "rect": [
+            252,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 17,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 3,
+          "rect": [
+            376,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 18,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 4,
+          "rect": [
+            500,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 19,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 5,
+          "rect": [
+            624,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 20,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 6,
+          "rect": [
+            748,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 21,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 7,
+          "rect": [
+            872,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        },
+        {
+          "index": 22,
+          "state": "ready-hacking",
+          "row": 2,
+          "column": 8,
+          "rect": [
+            996,
+            192,
+            120,
+            90
+          ],
+          "origin": [
+            59,
+            91
+          ]
+        }
+      ]
+    }
+  ]
+}
