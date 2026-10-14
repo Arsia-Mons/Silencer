@@ -237,6 +237,18 @@ type gameEndedEvent struct {
 	Timestamp int64  `json:"ts"`
 }
 
+type gameKillEvent struct {
+	GameID          uint32 `json:"gameId"`
+	MapName         string `json:"mapName"`
+	X               int32  `json:"x"`
+	Y               int32  `json:"y"`
+	KillerAccountID uint32 `json:"killerAccountId"`
+	VictimAccountID uint32 `json:"victimAccountId"`
+	Weapon          uint8  `json:"weapon"`
+	AgencyIdx       uint8  `json:"agencyIdx"`
+	Timestamp       int64  `json:"ts"`
+}
+
 type gameHeartbeatEvent struct {
 	GameID    uint32 `json:"gameId"`
 	TickCount uint32 `json:"tickCount"`

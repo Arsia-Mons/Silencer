@@ -105,6 +105,25 @@ void DedicatedServer::SendHeartBeat(World & world, Uint8 state){
 	sendto(sockethandle, data.data, data.BitsToBytes(data.offset), 0, (sockaddr *)&addr, sizeof(addr));
 }
 
+void DedicatedServer::SendKillEvent(Uint32 killerAccountId, Uint32 victimAccountId, Uint8 weapon, Uint8 agencyIdx, Sint32 x, Sint32 y){
+	if(!active) return;
+	Serializer data;
+	Uint8 code = 1;
+	data.Put(code);
+	data.Put(gameid);
+	data.Put(killerAccountId);
+	data.Put(victimAccountId);
+	data.Put(weapon);
+	data.Put(agencyIdx);
+	data.Put(x);
+	data.Put(y);
+	sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(lobbyport);
+	addr.sin_addr.s_addr = inet_addr(lobbyaddress);
+	sendto(sockethandle, data.data, data.BitsToBytes(data.offset), 0, (sockaddr *)&addr, sizeof(addr));
+}
+
 void DedicatedServer::Ban(Uint32 accountid){
 	if(!IsBanned(accountid)){
 		banlist.push_back(accountid);

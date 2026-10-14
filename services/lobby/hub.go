@@ -433,6 +433,31 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 	}
 }
 
+// OnKillEvent is called from the UDP listener when a dedicated server reports a kill.
+func (h *Hub) OnKillEvent(gameID, killerAccountID, victimAccountID uint32, weapon, agencyIdx uint8, x, y int32) {
+	h.mu.Lock()
+	g, ok := h.games[gameID]
+	var mapName string
+	if ok {
+		mapName = g.MapName
+	}
+	h.mu.Unlock()
+	if !ok || h.events == nil {
+		return
+	}
+	h.events.Publish("game.kill_event", gameKillEvent{
+		GameID:          gameID,
+		MapName:         mapName,
+		X:               x,
+		Y:               y,
+		KillerAccountID: killerAccountID,
+		VictimAccountID: victimAccountID,
+		Weapon:          weapon,
+		AgencyIdx:       agencyIdx,
+		Timestamp:       time.Now().UnixMilli(),
+	})
+}
+
 func uint32SliceEq(a, b []uint32) bool {
 	if len(a) != len(b) {
 		return false
