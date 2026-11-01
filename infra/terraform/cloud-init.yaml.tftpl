@@ -40,6 +40,43 @@ packages:
   - libminizip1t64
 
 write_files:
+  # CVE-2026-98432 mitigation: drop TCP packets carrying IPv4 options
+  # (IHL > 5). Remove once the booted kernel has upstream fix e3f33b0.
+  - path: /etc/silencer/cve-2026-98432.nft
+    permissions: "0644"
+    content: |
+      table ip cve_2026_98432
+      delete table ip cve_2026_98432
+      table ip cve_2026_98432 {
+      	chain pre {
+      		type filter hook prerouting priority -300; policy accept;
+      		meta l4proto tcp ip hdrlength gt 5 counter drop
+      	}
+      }
+
+  - path: /etc/systemd/system/silencer-cve-2026-98432.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Drop TCP packets with IPv4 options (CVE-2026-98432)
+      Wants=network-pre.target
+      Before=network-pre.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/sbin/nft -f /etc/silencer/cve-2026-98432.nft
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # Nothing here listens on MPTCP; disabling it removes the published
+  # CVE-2026-98432 exploit setup (Go >= 1.24 listeners default to MPTCP).
+  - path: /etc/sysctl.d/99-silencer-no-mptcp.conf
+    permissions: "0644"
+    content: |
+      net.mptcp.enabled = 0
+
   # Pulls Mongo + LavinMQ creds from SSM and writes /etc/silencer/lobby.env.
   # Idempotent — overwrites the file on every run, so this is also the
   # rotation tool: update the SSM param, ssh in, run this script, then
@@ -107,6 +144,9 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
+  - systemctl daemon-reload
+  - systemctl enable --now silencer-cve-2026-98432.service
+  - sysctl -p /etc/sysctl.d/99-silencer-no-mptcp.conf
   - mkdir -p /opt/${project_name}/releases
   # Wait for the EBS data volume (aws_volume_attachment runs after instance boot,
   # so bootcmd fires too early — hence runcmd with a device-wait loop). Format
